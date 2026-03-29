@@ -4,19 +4,39 @@ Guide for using Supabase Realtime Broadcast and Edge Functions in the WaitDesk A
 
 ## Package Version
 
-| Package | Version | Source |
-|---------|---------|--------|
+
+| Package        | Version                       | Source                                                                           |
+| -------------- | ----------------------------- | -------------------------------------------------------------------------------- |
 | supabase-swift | `>= 2.0.0` (up to next major) | [github.com/supabase/supabase-swift](https://github.com/supabase/supabase-swift) |
 
-Added via Swift Package Manager in Xcode. The `Supabase` product is linked to the `WaitDesk-clip` target.
+
+Added via Swift Package Manager in Xcode.
+
+## Dependencies Added
+
+The following SPM products from `supabase-swift` are linked to the **WaitDesk-clip** (App Clip) target:
+
+
+| Product    | Purpose                                                            |
+| ---------- | ------------------------------------------------------------------ |
+| `Supabase` | Umbrella module — includes Realtime, Functions, Storage, PostgREST |
+| `Auth`     | Authentication client (session management, token refresh)          |
+
+
+Both come from a single SPM package reference:
+
+```
+Package URL: https://github.com/supabase/supabase-swift
+Version rule: Up to Next Major, minimum 2.0.0
+```
 
 ## Official Documentation
 
-- **Realtime Broadcast**: https://supabase.com/docs/guides/realtime/broadcast
-- **Swift Broadcast examples**: https://supabase.com/docs/guides/realtime/broadcast?language=swift
-- **Edge Functions (invoke)**: https://supabase.com/docs/reference/swift/functions-invoke
-- **Swift SDK reference**: https://supabase.com/docs/reference/swift/introduction
-- **Auth session warning (PR #822)**: https://github.com/supabase/supabase-swift/pull/822
+- **Realtime Broadcast**: [https://supabase.com/docs/guides/realtime/broadcast](https://supabase.com/docs/guides/realtime/broadcast)
+- **Swift Broadcast examples**: [https://supabase.com/docs/guides/realtime/broadcast?language=swift](https://supabase.com/docs/guides/realtime/broadcast?language=swift)
+- **Edge Functions (invoke)**: [https://supabase.com/docs/reference/swift/functions-invoke](https://supabase.com/docs/reference/swift/functions-invoke)
+- **Swift SDK reference**: [https://supabase.com/docs/reference/swift/introduction](https://supabase.com/docs/reference/swift/introduction)
+- **Auth session warning (PR #822)**: [https://github.com/supabase/supabase-swift/pull/822](https://github.com/supabase/supabase-swift/pull/822)
 
 ## Client Initialization
 
@@ -94,3 +114,4 @@ let response: PartyResponse = try await supabase.functions.invoke(
 - **Generic return type** — `invoke` decodes JSON into the type you specify (`PartyResponse` above).
 - **Input** — Pass a `Codable` body via `FunctionInvokeOptions(body:)`. It's sent as `POST` with `Content-Type: application/json`.
 - **Auth** — The SDK automatically attaches the anon key (or user JWT if signed in) as the `Authorization` header.
+

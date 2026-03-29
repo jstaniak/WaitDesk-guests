@@ -8,6 +8,10 @@
 
 /* Begin PBXBuildFile section */
 		3AD3EC602F787163000DA017 /* WaitDesk-clip.app in Embed App Clips */ = {isa = PBXBuildFile; fileRef = 3AD3EC542F787162000DA017 /* WaitDesk-clip.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		3AD3EC692F787164000DA017 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 3AD3EC672F787164000DA017 /* Supabase */; };
+		3AD3EC6A2F787164000DA017 /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = 3AD3EC682F787164000DA017 /* Auth */; };
+		3AD3EC6B2F787164000DA017 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 3AD3EC6D2F787164000DA017 /* Supabase */; };
+		3AD3EC6C2F787164000DA017 /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = 3AD3EC6E2F787164000DA017 /* Auth */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -70,6 +74,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3AD3EC6B2F787164000DA017 /* Supabase in Frameworks */,
+				3AD3EC6C2F787164000DA017 /* Auth in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -77,6 +83,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3AD3EC692F787164000DA017 /* Supabase in Frameworks */,
+				3AD3EC6A2F787164000DA017 /* Auth in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -123,6 +131,8 @@
 			);
 			name = "WaitDesk-guests";
 			packageProductDependencies = (
+				3AD3EC6D2F787164000DA017 /* Supabase */,
+				3AD3EC6E2F787164000DA017 /* Auth */,
 			);
 			productName = "WaitDesk-guests";
 			productReference = 3AD3EC422F787115000DA017 /* WaitDesk-guests.app */;
@@ -145,6 +155,8 @@
 			);
 			name = "WaitDesk-clip";
 			packageProductDependencies = (
+				3AD3EC672F787164000DA017 /* Supabase */,
+				3AD3EC682F787164000DA017 /* Auth */,
 			);
 			productName = "WaitDesk-clip";
 			productReference = 3AD3EC542F787162000DA017 /* WaitDesk-clip.app */;
@@ -179,6 +191,9 @@
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 3AD3EC432F787115000DA017 /* Products */;
+			packageReferences = (
+				3AD3EC662F787164000DA017 /* XCRemoteSwiftPackageReference "supabase-swift" */,
+			);
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -511,6 +526,40 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		3AD3EC662F787164000DA017 /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase/supabase-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		3AD3EC672F787164000DA017 /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3AD3EC662F787164000DA017 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
+		};
+		3AD3EC682F787164000DA017 /* Auth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3AD3EC662F787164000DA017 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Auth;
+		};
+		3AD3EC6D2F787164000DA017 /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3AD3EC662F787164000DA017 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
+		};
+		3AD3EC6E2F787164000DA017 /* Auth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3AD3EC662F787164000DA017 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Auth;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 3AD3EC3A2F787115000DA017 /* Project object */;
 }
