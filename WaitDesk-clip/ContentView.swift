@@ -28,9 +28,15 @@ struct PartyResponse: Decodable {
     let data: PartyData
 }
 
+struct PositionResponse: Decodable {
+    let success: Bool
+    let position: Int?
+}
+
 struct ContentView: View {
     @State private var name: String = ""
     @State private var status: String = ""
+    @State private var position: Int?
     @State private var connectionStatus = "Loading…"
 
     var body: some View {
@@ -42,6 +48,13 @@ struct ContentView: View {
             if !name.isEmpty {
                 Text(name)
                     .font(.largeTitle.weight(.bold))
+
+                if let position {
+                    Text("#\(position) in line")
+                        .font(.system(.title, design: .rounded, weight: .semibold))
+                        .monospacedDigit()
+                        .contentTransition(.numericText())
+                }
 
                 Text(status)
                     .font(.title3)
@@ -55,8 +68,11 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()
         .task {
-            // 1. Fetch initial party data
-            guard let data = await fetchPartyData() else { return }
+            // 1. Fetch initial party data + position
+            async let dataTask = fetchPartyData()
+            async let posTask: Void = fetchPosition()
+            _ = await posTask
+            guard let data = await dataTask else { return }
 
             // 2. Subscribe to broadcast using businessShortCode from response
             await supabase.realtimeV2.connect()
@@ -75,7 +91,9 @@ struct ContentView: View {
 
             // 3. On each broadcast event, re-fetch and update
             for await _ in stream {
-                _ = await fetchPartyData()
+                async let p = fetchPartyData()
+                async let q: Void = fetchPosition()
+                _ = await (p, q)
             }
         }
     }
@@ -93,6 +111,20 @@ struct ContentView: View {
         } catch {
             connectionStatus = "Fetch error: \(error.localizedDescription)"
             return nil
+        }
+    }
+
+    private func fetchPosition() async {
+        do {
+            let response: PositionResponse = try await supabase.functions.invoke(
+                "get-position",
+                options: .init(body: ["shortCode": partyShortCode])
+            )
+            withAnimation {
+                position = response.position
+            }
+        } catch {
+            print("Position fetch error: \(error.localizedDescription)")
         }
     }
 
