@@ -137,7 +137,7 @@ private enum GuestStatus: Equatable {
     }
 }
 
-struct ContentView: View {
+struct StatusView: View {
     @State private var partyName: String = ""
     @State private var companyName: String = ""
     @State private var companyLogo: UIImage?
@@ -391,5 +391,5 @@ struct ContentView: View {
 }
 
 #Preview {
-    ContentView()
+    StatusView()
 }
