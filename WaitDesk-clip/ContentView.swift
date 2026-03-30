@@ -7,6 +7,7 @@
 
 import Supabase
 import SwiftUI
+import UIKit
 
 let supabase = SupabaseClient(
     supabaseURL: URL(string: SupabaseConfig.url)!,
@@ -28,13 +29,25 @@ struct PartyResponse: Decodable {
     let data: PartyData
 }
 
+struct CompanyData: Decodable {
+    let name: String
+    let logoData: String?
+}
+
+struct CompanyResponse: Decodable {
+    let success: Bool
+    let data: CompanyData
+}
+
 struct PositionResponse: Decodable {
     let success: Bool
     let position: Int?
 }
 
 struct ContentView: View {
-    @State private var name: String = ""
+    @State private var partyName: String = ""
+    @State private var companyName: String = ""
+    @State private var companyLogo: UIImage?
     @State private var status: String = ""
     @State private var position: Int?
     @State private var connectionStatus = "Loading…"
@@ -45,8 +58,25 @@ struct ContentView: View {
                 .font(.caption2)
                 .foregroundStyle(connectionStatus == "Listening ✓" ? .green : .orange)
 
-            if !name.isEmpty {
-                Text(name)
+            if companyLogo != nil || !companyName.isEmpty {
+                VStack(spacing: 12) {
+                    if let companyLogo {
+                        Image(uiImage: companyLogo)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxWidth: 120, maxHeight: 72)
+                    }
+
+                    if !companyName.isEmpty {
+                        Text(companyName)
+                            .font(.headline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            if !partyName.isEmpty {
+                Text(partyName)
                     .font(.largeTitle.weight(.bold))
 
                 if let position {
@@ -73,6 +103,7 @@ struct ContentView: View {
             async let posTask: Void = fetchPosition()
             _ = await posTask
             guard let data = await dataTask else { return }
+            await fetchCompanyData(shortCode: data.businessShortCode)
 
             // 2. Subscribe to broadcast using businessShortCode from response
             await supabase.realtimeV2.connect()
@@ -105,12 +136,25 @@ struct ContentView: View {
                 "get-party-data",
                 options: .init(body: ["shortCode": partyShortCode])
             )
-            name = response.data.name
+            partyName = response.data.name
             status = response.data.status
             return response.data
         } catch {
             connectionStatus = "Fetch error: \(error.localizedDescription)"
             return nil
+        }
+    }
+
+    private func fetchCompanyData(shortCode: String) async {
+        do {
+            let response: CompanyResponse = try await supabase.functions.invoke(
+                "get-company-data",
+                options: .init(body: ["shortCode": shortCode])
+            )
+            companyName = response.data.name
+            companyLogo = await loadCompanyLogo(from: response.data.logoData)
+        } catch {
+            print("Company fetch error: \(error.localizedDescription)")
         }
     }
 
@@ -126,6 +170,37 @@ struct ContentView: View {
         } catch {
             print("Position fetch error: \(error.localizedDescription)")
         }
+    }
+
+    private func loadCompanyLogo(from logoData: String?) async -> UIImage? {
+        guard let logoData, !logoData.isEmpty else { return nil }
+
+        if let imageData = decodeBase64ImageData(from: logoData) {
+            return UIImage(data: imageData)
+        }
+
+        guard let url = URL(string: logoData) else { return nil }
+
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            return UIImage(data: data)
+        } catch {
+            print("Company logo load error: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    private func decodeBase64ImageData(from value: String) -> Data? {
+        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if let commaIndex = trimmedValue.firstIndex(of: ","),
+           trimmedValue[..<commaIndex].contains("base64")
+        {
+            let encoded = String(trimmedValue[trimmedValue.index(after: commaIndex)...])
+            return Data(base64Encoded: encoded)
+        }
+
+        return Data(base64Encoded: trimmedValue)
     }
 
     private func statusColor(_ status: String) -> Color {
