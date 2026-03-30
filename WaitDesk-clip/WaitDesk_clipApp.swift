@@ -5,7 +5,7 @@ import SwiftUI
 struct WaitDesk_clipApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            StatusView()
         }
     }
 }
