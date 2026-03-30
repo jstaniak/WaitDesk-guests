@@ -1,3 +1,4 @@
+handle 404 - not found
 error handling HTTP and exceptions
 load all data on reload / reconection
 periodic status update

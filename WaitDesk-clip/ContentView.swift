@@ -1,9 +1,3 @@
-//
-//  ContentView.swift
-//  WaitDesk-clip
-//
-//  Created by user294080 on 3/28/26.
-//
 
 import Supabase
 import SwiftUI
@@ -15,7 +9,7 @@ let supabase = SupabaseClient(
     options: .init(auth: .init(emitLocalSessionAsInitialSession: true))
 )
 
-private let partyShortCode = "3yasfd47dw"
+private let partyShortCode = "7y675ykaw1"
 
 struct PartyData: Decodable {
     let name: String
