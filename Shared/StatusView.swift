@@ -38,6 +38,62 @@ struct PositionResponse: Decodable {
     let position: Int?
 }
 
+private struct StatusSnapshot {
+    let party: PartyData
+    let company: CompanyData
+    let companyLogo: UIImage?
+    let position: Int?
+}
+
+private enum StatusLoadError: Equatable {
+    case notFound
+    case rateLimited
+    case generic
+
+    init(error: Error) {
+        guard let functionsError = error as? FunctionsError else {
+            self = .generic
+            return
+        }
+
+        switch functionsError {
+        case let .httpError(code, _):
+            switch code {
+            case 404:
+                self = .notFound
+            case 429:
+                self = .rateLimited            
+            default:
+                self = .generic
+            }
+        case .relayError:
+            self = .generic
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .notFound:
+            return "Not found"
+        case .rateLimited:
+            return "Too many requests"
+        case .generic:
+            return "Something went wrong"
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .notFound:
+            return "We couldn't find the requested waitlist information."
+        case .rateLimited:
+            return "Please wait a moment and try again."
+        case .generic:
+            return "We couldn't load your latest waitlist status right now."
+        }
+    }
+}
+
 private enum GuestStatus: Equatable {
     case waiting
     case notified
@@ -144,6 +200,7 @@ struct StatusView: View {
     @State private var status: String = ""
     @State private var notifiedAt: String?
     @State private var position: Int?
+    @State private var loadError: StatusLoadError?
     @State private var connectionStatus = "Loading..."
 
     private var guestStatus: GuestStatus {
@@ -151,60 +208,62 @@ struct StatusView: View {
     }
 
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(spacing: 24) {
-                Spacer(minLength: 28)
+        Group {
+            if let loadError {
+                errorStateView(loadError)
+            } else {
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 24) {
+                        Spacer(minLength: 28)
 
-                if companyLogo != nil || !companyName.isEmpty {
-                    companyHeader
-                }
-
-                if !partyName.isEmpty {
-                    welcomeText
-
-                    if guestStatus == .waiting {
-                        Text("Your position updates automatically as the queue moves.")
-                            .font(.system(size: 17))
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 16)
-                    }
-
-                    statusCircle
-
-                    VStack(spacing: 8) {
-                        Text(guestStatus.title)
-                            .font(.system(size: 24, weight: .bold))
-                            .multilineTextAlignment(.center)
-
-                        if !guestStatus.message.isEmpty {
-                            Text(guestStatus.message)
-                                .font(.system(size: 17))
-                                .foregroundStyle(.secondary)
-                                .multilineTextAlignment(.center)
+                        if companyLogo != nil || !companyName.isEmpty {
+                            companyHeader
                         }
-                    }
-                    .padding(.horizontal, 16)
 
-                    if guestStatus.showsInfoCard {
-                        infoCard
+                        if !partyName.isEmpty {
+                            welcomeText
+
+                            if guestStatus == .waiting {
+                                Text("Your position updates automatically as the queue moves.")
+                                    .font(.system(size: 17))
+                                    .foregroundStyle(.secondary)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal, 16)
+                            }
+
+                            statusCircle
+
+                            VStack(spacing: 8) {
+                                Text(guestStatus.title)
+                                    .font(.system(size: 24, weight: .bold))
+                                    .multilineTextAlignment(.center)
+
+                                if !guestStatus.message.isEmpty {
+                                    Text(guestStatus.message)
+                                        .font(.system(size: 17))
+                                        .foregroundStyle(.secondary)
+                                        .multilineTextAlignment(.center)
+                                }
+                            }
+                            .padding(.horizontal, 16)
+
+                            if guestStatus.showsInfoCard {
+                                infoCard
+                            }
+                        }
+
+                        Spacer(minLength: 28)
                     }
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 20)
                 }
-
-                Spacer(minLength: 28)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, 24)
-            .padding(.vertical, 20)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.white)
         .task {
-            async let dataTask = fetchPartyData()
-            async let posTask: Void = fetchPosition()
-            _ = await posTask
-            guard let data = await dataTask else { return }
-            await fetchCompanyData(shortCode: data.businessShortCode)
+            guard let data = await refreshStatusSnapshot() else { return }
 
             await supabase.realtimeV2.connect()
             connectionStatus = "Subscribing..."
@@ -221,9 +280,7 @@ struct StatusView: View {
             }
 
             for await _ in stream {
-                async let partyTask = fetchPartyData()
-                async let positionTask: Void = fetchPosition()
-                _ = await (partyTask, positionTask)
+                _ = await refreshStatusSnapshot()
             }
         }
     }
@@ -314,48 +371,102 @@ struct StatusView: View {
         .shadow(color: .black.opacity(0.05), radius: 10, y: 4)
     }
 
+    private func errorStateView(_ loadError: StatusLoadError) -> some View {
+        VStack(spacing: 20) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 48))
+                .foregroundStyle(Color(red: 0.93, green: 0.56, blue: 0.60))
+
+            VStack(spacing: 8) {
+                Text(loadError.title)
+                    .font(.system(size: 24, weight: .bold))
+                    .multilineTextAlignment(.center)
+
+                Text(loadError.message)
+                    .font(.system(size: 17))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .padding(.horizontal, 24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
     @discardableResult
-    private func fetchPartyData() async -> PartyData? {
+    private func refreshStatusSnapshot() async -> PartyData? {
         do {
-            let response: PartyResponse = try await supabase.functions.invoke(
-                "get-party-data",
-                options: .init(body: ["shortCode": partyShortCode])
+            async let partyTask = fetchPartyData()
+            async let positionTask = fetchPosition()
+
+            let party = try await partyTask
+            async let companyTask = fetchCompanyData(shortCode: party.businessShortCode)
+
+            let (company, position) = try await (companyTask, positionTask)
+            let snapshot = StatusSnapshot(
+                party: party,
+                company: company,
+                companyLogo: await loadCompanyLogo(from: company.logoData),
+                position: position
             )
-            partyName = response.data.name
-            status = response.data.status
-            notifiedAt = response.data.notified_at
-            return response.data
+
+            apply(snapshot)
+            connectionStatus = "Loaded"
+            return snapshot.party
         } catch {
+            apply(error: StatusLoadError(error: error))
             connectionStatus = "Fetch error: \(error.localizedDescription)"
             return nil
         }
     }
 
-    private func fetchCompanyData(shortCode: String) async {
-        do {
-            let response: CompanyResponse = try await supabase.functions.invoke(
-                "get-company-data",
-                options: .init(body: ["shortCode": shortCode])
-            )
-            companyName = response.data.name
-            companyLogo = await loadCompanyLogo(from: response.data.logoData)
-        } catch {
-            print("Company fetch error: \(error.localizedDescription)")
+    private func apply(_ snapshot: StatusSnapshot) {
+        loadError = nil
+        partyName = snapshot.party.name
+        companyName = snapshot.company.name
+        companyLogo = snapshot.companyLogo
+        status = snapshot.party.status
+        notifiedAt = snapshot.party.notified_at
+
+        withAnimation {
+            position = snapshot.position
         }
     }
 
-    private func fetchPosition() async {
-        do {
-            let response: PositionResponse = try await supabase.functions.invoke(
-                "get-position",
-                options: .init(body: ["shortCode": partyShortCode])
-            )
-            withAnimation {
-                position = response.position
-            }
-        } catch {
-            print("Position fetch error: \(error.localizedDescription)")
+    private func apply(error: StatusLoadError) {
+        loadError = error
+        partyName = ""
+        companyName = ""
+        companyLogo = nil
+        status = ""
+        notifiedAt = nil
+
+        withAnimation {
+            position = nil
         }
+    }
+
+    private func fetchPartyData() async throws -> PartyData {
+        let response: PartyResponse = try await supabase.functions.invoke(
+            "get-party-data",
+            options: .init(body: ["shortCode": partyShortCode])
+        )
+        return response.data
+    }
+
+    private func fetchCompanyData(shortCode: String) async throws -> CompanyData {
+        let response: CompanyResponse = try await supabase.functions.invoke(
+            "get-company-data",
+            options: .init(body: ["shortCode": shortCode])
+        )
+        return response.data
+    }
+
+    private func fetchPosition() async throws -> Int? {
+        let response: PositionResponse = try await supabase.functions.invoke(
+            "get-position",
+            options: .init(body: ["shortCode": partyShortCode])
+        )
+        return response.position
     }
 
     private func loadCompanyLogo(from logoData: String?) async -> UIImage? {
