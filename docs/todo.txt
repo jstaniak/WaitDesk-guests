@@ -1,4 +1,6 @@
-handle 404 - not found
-error handling HTTP and exceptions
-load all data on reload / reconection
+FCM - Remaining manual steps
+Add GoogleService-Info.plist from Firebase Console to the project (with target membership for both targets).
+Enable Push Notifications capability in Xcode Signing & Capabilities for both targets.
+Create the register-device-token Supabase edge function on the backend to persist the FCM token.
+
 periodic status update

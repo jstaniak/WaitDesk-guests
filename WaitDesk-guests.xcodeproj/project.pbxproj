@@ -12,6 +12,10 @@
 		3AD3EC6A2F787164000DA017 /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = 3AD3EC682F787164000DA017 /* Auth */; };
 		3AD3EC6B2F787164000DA017 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 3AD3EC6D2F787164000DA017 /* Supabase */; };
 		3AD3EC6C2F787164000DA017 /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = 3AD3EC6E2F787164000DA017 /* Auth */; };
+		3AFC22FB2F7C6FF6001581D1 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 3AFC22FA2F7C6FF6001581D1 /* FirebaseCore */; };
+		3AFC22FD2F7C6FFF001581D1 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 3AFC22FC2F7C6FFF001581D1 /* FirebaseMessaging */; };
+		3AFC22FF2F7C701B001581D1 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 3AFC22FE2F7C701B001581D1 /* FirebaseCore */; };
+		3AFC23012F7C7027001581D1 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 3AFC23002F7C7027001581D1 /* FirebaseMessaging */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -47,6 +51,7 @@
 		3ACC5A202F7B075C00D53553 /* Exceptions for "Shared" folder in "WaitDesk-guests" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				FirebaseMessagingClient.swift,
 				StatusView.swift,
 				SupabaseConfig.swift,
 			);
@@ -90,7 +95,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3AFC23012F7C7027001581D1 /* FirebaseMessaging in Frameworks */,
 				3AD3EC6B2F787164000DA017 /* Supabase in Frameworks */,
+				3AFC22FF2F7C701B001581D1 /* FirebaseCore in Frameworks */,
 				3AD3EC6C2F787164000DA017 /* Auth in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -99,7 +106,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3AFC22FD2F7C6FFF001581D1 /* FirebaseMessaging in Frameworks */,
 				3AD3EC692F787164000DA017 /* Supabase in Frameworks */,
+				3AFC22FB2F7C6FF6001581D1 /* FirebaseCore in Frameworks */,
 				3AD3EC6A2F787164000DA017 /* Auth in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -113,6 +122,7 @@
 				3ACC5A1E2F7B06D600D53553 /* Shared */,
 				3AD3EC442F787115000DA017 /* WaitDesk-guests */,
 				3AD3EC552F787162000DA017 /* WaitDesk-clip */,
+				3AFC22F92F7C6FF6001581D1 /* Frameworks */,
 				3AD3EC432F787115000DA017 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -124,6 +134,13 @@
 				3AD3EC542F787162000DA017 /* WaitDesk-clip.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		3AFC22F92F7C6FF6001581D1 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -150,6 +167,8 @@
 			packageProductDependencies = (
 				3AD3EC6D2F787164000DA017 /* Supabase */,
 				3AD3EC6E2F787164000DA017 /* Auth */,
+				3AFC22FE2F7C701B001581D1 /* FirebaseCore */,
+				3AFC23002F7C7027001581D1 /* FirebaseMessaging */,
 			);
 			productName = "WaitDesk-guests";
 			productReference = 3AD3EC422F787115000DA017 /* WaitDesk-guests.app */;
@@ -175,6 +194,8 @@
 			packageProductDependencies = (
 				3AD3EC672F787164000DA017 /* Supabase */,
 				3AD3EC682F787164000DA017 /* Auth */,
+				3AFC22FA2F7C6FF6001581D1 /* FirebaseCore */,
+				3AFC22FC2F7C6FFF001581D1 /* FirebaseMessaging */,
 			);
 			productName = "WaitDesk-clip";
 			productReference = 3AD3EC542F787162000DA017 /* WaitDesk-clip.app */;
@@ -209,6 +230,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				3AD3EC662F787164000DA017 /* XCRemoteSwiftPackageReference "supabase-swift" */,
+				3AFC22F82F7C6FD2001581D1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 3AD3EC432F787115000DA017 /* Products */;
@@ -388,6 +410,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 7DU9P2C2YX;
@@ -406,6 +429,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.getwaitdesk.WaitDesk-guests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
@@ -421,6 +445,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 7DU9P2C2YX;
@@ -439,6 +464,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.getwaitdesk.WaitDesk-guests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
@@ -455,6 +481,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "WaitDesk-clip/WaitDesk_clip.entitlements";
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 7DU9P2C2YX;
@@ -475,6 +502,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.getwaitdesk.WaitDesk-guests.Clip";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
@@ -491,6 +519,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "WaitDesk-clip/WaitDesk_clip.entitlements";
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 7DU9P2C2YX;
@@ -511,6 +540,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.getwaitdesk.WaitDesk-guests.Clip";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
@@ -562,6 +592,14 @@
 				minimumVersion = 2.0.0;
 			};
 		};
+		3AFC22F82F7C6FD2001581D1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.11.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -584,6 +622,26 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 3AD3EC662F787164000DA017 /* XCRemoteSwiftPackageReference "supabase-swift" */;
 			productName = Auth;
+		};
+		3AFC22FA2F7C6FF6001581D1 /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3AFC22F82F7C6FD2001581D1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
+		3AFC22FC2F7C6FFF001581D1 /* FirebaseMessaging */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3AFC22F82F7C6FD2001581D1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseMessaging;
+		};
+		3AFC22FE2F7C701B001581D1 /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3AFC22F82F7C6FD2001581D1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
+		3AFC23002F7C7027001581D1 /* FirebaseMessaging */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3AFC22F82F7C6FD2001581D1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseMessaging;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
