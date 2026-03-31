@@ -1,4 +1,6 @@
+import Combine
 import Supabase
+import Network
 import SwiftUI
 import UIKit
 
@@ -192,7 +194,29 @@ private enum GuestStatus: Equatable {
     }
 }
 
+private final class ConnectivityObserver: ObservableObject {
+    @Published private(set) var isConnected = true
+
+    private let monitor = NWPathMonitor()
+    private let queue = DispatchQueue(label: "ConnectivityObserver")
+
+    init() {
+        monitor.pathUpdateHandler = { [weak self] path in
+            DispatchQueue.main.async {
+                self?.isConnected = path.status == .satisfied
+            }
+        }
+        monitor.start(queue: queue)
+    }
+
+    deinit {
+        monitor.cancel()
+    }
+}
+
 struct StatusView: View {
+    @Environment(\.scenePhase) private var scenePhase
+    @StateObject private var connectivityObserver = ConnectivityObserver()
     @State private var partyName: String = ""
     @State private var companyName: String = ""
     @State private var companyLogo: UIImage?
@@ -201,6 +225,9 @@ struct StatusView: View {
     @State private var position: Int?
     @State private var loadError: StatusLoadError?
     @State private var connectionStatus = "Loading..."
+    @State private var refreshCycle = 0
+    @State private var hasLoadedInitialSnapshot = false
+    @State private var wasConnected = true
 
     private var guestStatus: GuestStatus {
         GuestStatus(status: status, notifiedAt: notifiedAt)
@@ -261,26 +288,56 @@ struct StatusView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemBackground))
-        .task {
-            guard let data = await refreshStatusSnapshot() else { return }
+        .onAppear {
+            wasConnected = connectivityObserver.isConnected
+        }
+        .task(id: refreshCycle) {
+            await runStatusLifecycle()
+        }
+        .onChange(of: scenePhase) { newPhase in
+            guard newPhase == .active else { return }
+            restartStatusLifecycle()
+        }
+        .onChange(of: connectivityObserver.isConnected) { isConnected in
+            defer { wasConnected = isConnected }
+            guard isConnected, !wasConnected else { return }
+            restartStatusLifecycle()
+        }
+    }
 
+    private func restartStatusLifecycle() {
+        refreshCycle += 1
+    }
+
+    private func runStatusLifecycle() async {
+        guard let data = await refreshStatusSnapshot() else { return }
+        hasLoadedInitialSnapshot = true
+
+        do {
+            try Task.checkCancellation()
             await supabase.realtimeV2.connect()
             connectionStatus = "Subscribing..."
 
             let channel = supabase.realtimeV2.channel("parties:\(data.businessShortCode)")
             let stream = await channel.broadcastStream(event: "*")
 
-            do {
-                try await channel.subscribeWithError()
-                connectionStatus = "Listening"
-            } catch {
-                connectionStatus = "Subscribe error: \(error.localizedDescription)"
-                return
+            defer {
+                Task {
+                    await channel.unsubscribe()
+                }
             }
 
+            try await channel.subscribeWithError()
+            connectionStatus = "Listening"
+
             for await _ in stream {
+                try Task.checkCancellation()
                 _ = await refreshStatusSnapshot()
             }
+        } catch is CancellationError {
+            connectionStatus = hasLoadedInitialSnapshot ? "Reconnecting..." : "Loading..."
+        } catch {
+            connectionStatus = "Subscribe error: \(error.localizedDescription)"
         }
     }
 
