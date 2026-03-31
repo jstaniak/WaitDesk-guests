@@ -260,7 +260,7 @@ struct StatusView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.white)
+        .background(Color(.systemBackground))
         .task {
             guard let data = await refreshStatusSnapshot() else { return }
 
@@ -306,7 +306,11 @@ struct StatusView: View {
     }
 
     private var welcomeText: some View {
-        Text("Welcome, \(Text(partyName).foregroundStyle(Color(red: 0.56, green: 0.39, blue: 0.96)))!")
+        (
+            Text("Welcome, ")
+            + Text(partyName).foregroundColor(Color(red: 0.56, green: 0.39, blue: 0.96))
+            + Text("!")
+        )
         .font(.system(size: 20))
         .multilineTextAlignment(.center)
     }
@@ -361,7 +365,7 @@ struct StatusView: View {
             Spacer(minLength: 0)
         }
         .padding(18)
-        .background(Color.white)
+        .background(Color(.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
