@@ -233,9 +233,15 @@ struct StatusView: View {
         GuestStatus(status: status, notifiedAt: notifiedAt)
     }
 
+    private var isInitialLoading: Bool {
+        !hasLoadedInitialSnapshot && partyName.isEmpty && loadError == nil
+    }
+
     var body: some View {
         Group {
-            if let loadError {
+            if isInitialLoading {
+                loadingStateView
+            } else if let loadError {
                 errorStateView(loadError)
             } else {
                 ScrollView(showsIndicators: false) {
@@ -310,7 +316,28 @@ struct StatusView: View {
     }
 
     private func runStatusLifecycle() async {
-        guard let data = await refreshStatusSnapshot() else { return }
+        var data: PartyData?
+
+        while !Task.isCancelled {
+            data = await refreshStatusSnapshot()
+
+            if data != nil || loadError != nil {
+                break
+            }
+
+            connectionStatus = "Loading your status"
+
+            do {
+                try await Task.sleep(nanoseconds: 2_000_000_000)
+            } catch is CancellationError {
+                connectionStatus = "Loading your status"
+                return
+            } catch {
+                return
+            }
+        }
+
+        guard let data else { return }
         hasLoadedInitialSnapshot = true
 
         do {
@@ -431,6 +458,19 @@ struct StatusView: View {
         .shadow(color: .black.opacity(0.05), radius: 10, y: 4)
     }
 
+    private var loadingStateView: some View {
+        VStack(spacing: 16) {
+            ProgressView()
+                .controlSize(.large)
+
+            Text("Loading your status")
+                .font(.system(size: 24, weight: .bold))
+                .multilineTextAlignment(.center)
+        }
+        .padding(.horizontal, 24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
     private func errorStateView(_ loadError: StatusLoadError) -> some View {
         VStack(spacing: 20) {
             Image(systemName: "exclamationmark.triangle.fill")
@@ -473,8 +513,15 @@ struct StatusView: View {
             connectionStatus = "Loaded"
             return snapshot.party
         } catch {
-            apply(error: StatusLoadError(error: error))
-            connectionStatus = "Fetch error: \(error.localizedDescription)"
+            let statusLoadError = StatusLoadError(error: error)
+
+            if hasLoadedInitialSnapshot || statusLoadError != .generic {
+                apply(error: statusLoadError)
+                connectionStatus = "Fetch error: \(error.localizedDescription)"
+            } else {
+                loadError = nil
+                connectionStatus = "Loading your status"
+            }
             return nil
         }
     }
