@@ -1,3 +1,5 @@
+# Firebase Cloud Messaging config file
+GoogleService-Info.plist
 
 # macOS
 .DS_Store
