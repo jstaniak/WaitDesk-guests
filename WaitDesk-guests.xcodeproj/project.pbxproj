@@ -48,6 +48,13 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		3A77B9692F7D53AB00DB9587 /* Exceptions for "WaitDesk-guests" folder in "WaitDesk-guests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 3AD3EC412F787115000DA017 /* WaitDesk-guests */;
+		};
 		3ACC5A202F7B075C00D53553 /* Exceptions for "Shared" folder in "WaitDesk-guests" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -77,6 +84,9 @@
 		};
 		3AD3EC442F787115000DA017 /* WaitDesk-guests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				3A77B9692F7D53AB00DB9587 /* Exceptions for "WaitDesk-guests" folder in "WaitDesk-guests" target */,
+			);
 			path = "WaitDesk-guests";
 			sourceTree = "<group>";
 		};
@@ -416,6 +426,7 @@
 				DEVELOPMENT_TEAM = 7DU9P2C2YX;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "WaitDesk-guests/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -451,6 +462,7 @@
 				DEVELOPMENT_TEAM = 7DU9P2C2YX;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "WaitDesk-guests/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
