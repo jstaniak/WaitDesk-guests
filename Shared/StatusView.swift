@@ -4,40 +4,7 @@ import Network
 import SwiftUI
 import UIKit
 
-let supabase = SupabaseClient(
-    supabaseURL: URL(string: SupabaseConfig.url)!,
-    supabaseKey: SupabaseConfig.anonKey,
-    options: .init(auth: .init(emitLocalSessionAsInitialSession: true))
-)
-
 private let partyShortCode = "7y675ykaw1"
-
-struct PartyData: Decodable {
-    let name: String
-    let status: String
-    let businessShortCode: String
-    let notified_at: String?
-}
-
-struct PartyResponse: Decodable {
-    let success: Bool
-    let data: PartyData
-}
-
-struct CompanyData: Decodable {
-    let name: String
-    let logoData: String?
-}
-
-struct CompanyResponse: Decodable {
-    let success: Bool
-    let data: CompanyData
-}
-
-struct PositionResponse: Decodable {
-    let success: Bool
-    let position: Int?
-}
 
 private struct StatusSnapshot {
     let party: PartyData
@@ -553,27 +520,15 @@ struct StatusView: View {
     }
 
     private func fetchPartyData() async throws -> PartyData {
-        let response: PartyResponse = try await supabase.functions.invoke(
-            "get-party-data",
-            options: .init(body: ["shortCode": partyShortCode])
-        )
-        return response.data
+        try await SupabaseFunctionsClient.shared.fetchPartyData(shortCode: partyShortCode)
     }
 
     private func fetchCompanyData(shortCode: String) async throws -> CompanyData {
-        let response: CompanyResponse = try await supabase.functions.invoke(
-            "get-company-data",
-            options: .init(body: ["shortCode": shortCode])
-        )
-        return response.data
+        try await SupabaseFunctionsClient.shared.fetchCompanyData(shortCode: shortCode)
     }
 
     private func fetchPosition() async throws -> Int? {
-        let response: PositionResponse = try await supabase.functions.invoke(
-            "get-position",
-            options: .init(body: ["shortCode": partyShortCode])
-        )
-        return response.position
+        try await SupabaseFunctionsClient.shared.fetchPosition(shortCode: partyShortCode)
     }
 
     private func loadCompanyLogo(from logoData: String?) async -> UIImage? {

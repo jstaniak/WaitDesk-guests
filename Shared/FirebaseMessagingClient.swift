@@ -1,7 +1,6 @@
 import UIKit
 import FirebaseCore
 import FirebaseMessaging
-import Supabase
 
 class WaitDeskAppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate {
 
@@ -31,10 +30,7 @@ class WaitDeskAppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate {
 
     private func sendTokenToBackend(_ fcmToken: String) async {
         do {
-            try await supabase.functions.invoke(
-                "register-device-token",
-                options: .init(body: ["fcmToken": fcmToken])
-            )
+            try await SupabaseFunctionsClient.shared.registerDeviceToken(fcmToken)
         } catch {
             print("FCM token registration failed: \(error.localizedDescription)")
         }

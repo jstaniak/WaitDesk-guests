@@ -60,6 +60,7 @@
 			membershipExceptions = (
 				FirebaseMessagingClient.swift,
 				StatusView.swift,
+				SupabaseFunctionsClient.swift,
 				SupabaseConfig.swift,
 			);
 			target = 3AD3EC412F787115000DA017 /* WaitDesk-guests */;
