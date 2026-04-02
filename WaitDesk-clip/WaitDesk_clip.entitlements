@@ -6,7 +6,7 @@
 	<string>development</string>
 	<key>com.apple.developer.associated-domains</key>
 	<array>
-		<string>getwaitdesk.com</string>
+		<string>appclips:getwaitdesk.com</string>
 	</array>
 	<key>com.apple.developer.parent-application-identifiers</key>
 	<array>
