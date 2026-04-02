@@ -87,7 +87,7 @@ private enum GuestStatus: Equatable {
         }
     }
 
-    var circleColor: Color {
+    var circleBaseColor: Color {
         switch self {
         case .waiting:
             return Color(red: 0.56, green: 0.39, blue: 0.96)
@@ -96,21 +96,37 @@ private enum GuestStatus: Equatable {
         case .served:
             return Color(red: 0.14, green: 0.75, blue: 0.36)
         case .cancelled, .noShow:
-            return Color(.systemGray5)
+            return Color(red: 0.18, green: 0.42, blue: 0.97)
+        }
+    }
+
+    var circleGradientColors: [Color] {
+        switch self {
+        case .waiting:
+            return [
+                Color(red: 0.67, green: 0.52, blue: 0.99),
+                circleBaseColor
+            ]
+        case .notified:
+            return [
+                Color(red: 0.97, green: 0.67, blue: 0.71),
+                circleBaseColor
+            ]
+        case .served:
+            return [
+                Color(red: 0.24, green: 0.82, blue: 0.44),
+                circleBaseColor
+            ]
+        case .cancelled, .noShow:
+            return [
+                Color(red: 0.34, green: 0.57, blue: 0.99),
+                circleBaseColor
+            ]
         }
     }
 
     var circleShadowColor: Color {
-        switch self {
-        case .waiting:
-            return Color(red: 0.56, green: 0.39, blue: 0.96).opacity(0.24)
-        case .notified:
-            return Color(red: 0.88, green: 0.48, blue: 0.54).opacity(0.24)
-        case .served:
-            return Color(red: 0.10, green: 0.67, blue: 0.32).opacity(0.24)
-        case .cancelled, .noShow:
-            return Color.black.opacity(0.08)
-        }
+        circleBaseColor.opacity(0.3)
     }
 
     var title: String {
@@ -156,8 +172,51 @@ private enum GuestStatus: Equatable {
         self == .waiting || self == .notified
     }
 
-    var darkIcon: Bool {
-        self == .cancelled || self == .noShow
+    var circleStrokeOpacity: Double {
+        switch self {
+        case .cancelled, .noShow:
+            return 0.5
+        default:
+            return 0.68
+        }
+    }
+
+    var showsLeaveQueueButton: Bool {
+        self == .waiting || self == .notified
+    }
+}
+
+private struct StatusLayoutMetrics {
+    let topPadding: CGFloat
+    let contentSpacing: CGFloat
+    let circleSize: CGFloat
+    let logoMaxWidth: CGFloat
+    let logoMaxHeight: CGFloat
+    let companyNameSize: CGFloat
+    let welcomeTextSize: CGFloat
+
+    static func make(for height: CGFloat) -> StatusLayoutMetrics {
+        if height < 760 {
+            return StatusLayoutMetrics(
+                topPadding: 18,
+                contentSpacing: 18,
+                circleSize: 168,
+                logoMaxWidth: 112,
+                logoMaxHeight: 64,
+                companyNameSize: 24,
+                welcomeTextSize: 18
+            )
+        }
+
+        return StatusLayoutMetrics(
+            topPadding: 28,
+            contentSpacing: 24,
+            circleSize: 188,
+            logoMaxWidth: 124,
+            logoMaxHeight: 76,
+            companyNameSize: 28,
+            welcomeTextSize: 20
+        )
     }
 }
 
@@ -195,6 +254,8 @@ struct StatusView: View {
     @State private var refreshCycle = 0
     @State private var hasLoadedInitialSnapshot = false
     @State private var wasConnected = true
+    @State private var isCancelling = false
+    @State private var cancelErrorMessage: String?
 
     private var guestStatus: GuestStatus {
         GuestStatus(status: status, notifiedAt: notifiedAt)
@@ -205,62 +266,77 @@ struct StatusView: View {
     }
 
     var body: some View {
-        Group {
-            if isInitialLoading {
-                loadingStateView
-            } else if let loadError {
-                errorStateView(loadError)
-            } else {
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 24) {
-                        Spacer(minLength: 28)
+        GeometryReader { geometry in
+            let metrics = StatusLayoutMetrics.make(for: geometry.size.height)
 
-                        if companyLogo != nil || !companyName.isEmpty {
-                            companyHeader
-                        }
-
-                        if !partyName.isEmpty {
-                            welcomeText
-
-                            if guestStatus == .waiting {
-                                Text("Your position updates automatically as the queue moves.")
-                                    .font(.system(size: 17))
-                                    .foregroundStyle(.secondary)
-                                    .multilineTextAlignment(.center)
-                                    .padding(.horizontal, 16)
+            Group {
+                if isInitialLoading {
+                    loadingStateView
+                } else if let loadError {
+                    errorStateView(loadError)
+                } else {
+                    ScrollView(showsIndicators: false) {
+                        VStack(spacing: metrics.contentSpacing) {
+                            if companyLogo != nil || !companyName.isEmpty {
+                                companyHeader(metrics: metrics)
                             }
 
-                            statusCircle
+                            if !partyName.isEmpty {
+                                welcomeText(fontSize: metrics.welcomeTextSize)
 
-                            VStack(spacing: 8) {
-                                Text(guestStatus.title)
-                                    .font(.system(size: 24, weight: .bold))
-                                    .multilineTextAlignment(.center)
-
-                                if !guestStatus.message.isEmpty {
-                                    Text(guestStatus.message)
+                                if guestStatus == .waiting {
+                                    Text("Your position updates automatically as the queue moves.")
                                         .font(.system(size: 17))
                                         .foregroundStyle(.secondary)
                                         .multilineTextAlignment(.center)
+                                        .padding(.horizontal, 16)
+                                }
+
+                                statusCircle(size: metrics.circleSize)
+
+                                VStack(spacing: 8) {
+                                    Text(guestStatus.title)
+                                        .font(.system(size: 24, weight: .bold))
+                                        .multilineTextAlignment(.center)
+
+                                    if !guestStatus.message.isEmpty {
+                                        Text(guestStatus.message)
+                                            .font(.system(size: 17))
+                                            .foregroundStyle(.secondary)
+                                            .multilineTextAlignment(.center)
+                                    }
+                                }
+                                .padding(.horizontal, 16)
+
+                                if guestStatus.showsInfoCard {
+                                    infoCard
                                 }
                             }
-                            .padding(.horizontal, 16)
-
-                            if guestStatus.showsInfoCard {
-                                infoCard
-                            }
                         }
-
-                        Spacer(minLength: 28)
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, 24)
+                        .padding(.top, metrics.topPadding)
+                        .padding(.bottom, 24)
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 20)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .background(Color(.systemBackground))
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if !partyName.isEmpty && guestStatus.showsLeaveQueueButton && !isInitialLoading && loadError == nil {
+                    leaveQueueButton
+                        .padding(.horizontal, 24)
+                        .padding(.top, 8)
+                        .padding(.bottom, geometry.safeAreaInsets.bottom > 0 ? 8 : 14)
+                        .background(Color(.systemBackground))
                 }
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemBackground))
+        .alert("Unable to leave queue", isPresented: cancelErrorAlertBinding) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(cancelErrorMessage ?? "Please try again.")
+        }
         .onAppear {
             wasConnected = connectivityObserver.isConnected
         }
@@ -335,13 +411,13 @@ struct StatusView: View {
         }
     }
 
-    private var companyHeader: some View {
+    private func companyHeader(metrics: StatusLayoutMetrics) -> some View {
         VStack(spacing: 14) {
             if let companyLogo {
                 Image(uiImage: companyLogo)
                     .resizable()
                     .scaledToFit()
-                    .frame(maxWidth: 124, maxHeight: 76)
+                    .frame(maxWidth: metrics.logoMaxWidth, maxHeight: metrics.logoMaxHeight)
                     .padding(16)
                     .background(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
@@ -350,32 +426,34 @@ struct StatusView: View {
 
             if !companyName.isEmpty {
                 Text(companyName)
-                    .font(.system(size: 28, weight: .bold))
+                    .font(.system(size: metrics.companyNameSize, weight: .bold))
                     .multilineTextAlignment(.center)
             }
         }
     }
 
-    private var welcomeText: some View {
+    private func welcomeText(fontSize: CGFloat) -> some View {
         (
             Text("Welcome, ")
             + Text(partyName).foregroundColor(Color(red: 0.56, green: 0.39, blue: 0.96))
             + Text("!")
         )
-        .font(.system(size: 20))
+        .font(.system(size: fontSize))
         .multilineTextAlignment(.center)
     }
 
-    private var statusCircle: some View {
+    private func statusCircle(size: CGFloat) -> some View {
         ZStack {
             Circle()
-                .fill(guestStatus.circleColor)
-                .frame(width: 188, height: 188)
-                .overlay(
-                    Circle()
-                        .stroke(.white.opacity(0.68), lineWidth: 4)
+                .fill(
+                    LinearGradient(
+                        colors: guestStatus.circleGradientColors,
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
                 )
-                .shadow(color: guestStatus.circleShadowColor, radius: 16, y: 8)
+                .frame(width: size, height: size)
+                .shadow(color: guestStatus.circleShadowColor, radius: 18, y: 8)
 
             if guestStatus == .waiting {
                 Text(positionText)
@@ -386,7 +464,7 @@ struct StatusView: View {
             } else if let iconName = guestStatus.iconName {
                 Image(systemName: iconName)
                     .font(.system(size: 72, weight: .bold))
-                    .foregroundStyle(guestStatus.darkIcon ? Color.primary : Color.white)
+                    .foregroundStyle(.white)
             }
         }
     }
@@ -423,6 +501,32 @@ struct StatusView: View {
                 .stroke(Color.black.opacity(0.06), lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.05), radius: 10, y: 4)
+    }
+
+    private var leaveQueueButton: some View {
+        Button {
+            Task {
+                await cancelQueue()
+            }
+        } label: {
+            HStack(spacing: 10) {
+                if isCancelling {
+                    ProgressView()
+                        .tint(.primary)
+                } else {
+                    Image(systemName: "xmark.circle")
+                        .font(.system(size: 18, weight: .medium))
+                }
+
+                Text(isCancelling ? "Leaving queue..." : "Leave queue")
+                    .font(.system(size: 20, weight: .medium))
+            }
+            .foregroundStyle(.primary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+        }
+        .buttonStyle(.plain)
+        .disabled(isCancelling)
     }
 
     private var loadingStateView: some View {
@@ -469,17 +573,24 @@ struct StatusView: View {
             async let companyTask = fetchCompanyData(shortCode: party.businessShortCode)
 
             let (company, position) = try await (companyTask, positionTask)
+            let companyLogo = await loadCompanyLogo(from: company.logoData)
+            try Task.checkCancellation()
             let snapshot = StatusSnapshot(
                 party: party,
                 company: company,
-                companyLogo: await loadCompanyLogo(from: company.logoData),
+                companyLogo: companyLogo,
                 position: position
             )
 
+            try Task.checkCancellation()
             apply(snapshot)
             connectionStatus = "Loaded"
             return snapshot.party
+        } catch is CancellationError {
+            return nil
         } catch {
+            guard !Task.isCancelled else { return nil }
+
             let statusLoadError = StatusLoadError(error: error)
 
             if hasLoadedInitialSnapshot || statusLoadError != .generic {
@@ -560,6 +671,37 @@ struct StatusView: View {
         }
 
         return Data(base64Encoded: trimmedValue)
+    }
+
+    private var cancelErrorAlertBinding: Binding<Bool> {
+        Binding(
+            get: { cancelErrorMessage != nil },
+            set: { isPresented in
+                if !isPresented {
+                    cancelErrorMessage = nil
+                }
+            }
+        )
+    }
+
+    @MainActor
+    private func cancelQueue() async {
+        guard !isCancelling else { return }
+
+        isCancelling = true
+        defer { isCancelling = false }
+
+        do {
+            try await SupabaseFunctionsClient.shared.cancelQueue(shortCode: partyShortCode)
+
+            withAnimation {
+                status = "cancelled"
+                notifiedAt = nil
+                position = nil
+            }
+        } catch {
+            cancelErrorMessage = error.localizedDescription
+        }
     }
 }
 

@@ -32,20 +32,27 @@ final class SupabaseFunctionsClient {
         return response.data
     }
 
-    func fetchCompanyData(shortCode: String) async throws -> CompanyData {
-        let response: CompanyResponse = try await supabase.functions.invoke(
-            "get-company-data",
-            options: .init(body: ["shortCode": shortCode])
-        )
-        return response.data
-    }
-
     func fetchPosition(shortCode: String) async throws -> Int? {
         let response: PositionResponse = try await supabase.functions.invoke(
             "get-position",
             options: .init(body: ["shortCode": shortCode])
         )
         return response.position
+    }
+
+    func cancelQueue(shortCode: String) async throws {
+        try await supabase.functions.invoke(
+            "cancel-queue",
+            options: .init(body: ["shortCode": shortCode])
+        )
+    }
+
+    func fetchCompanyData(shortCode: String) async throws -> CompanyData {
+        let response: CompanyResponse = try await supabase.functions.invoke(
+            "get-company-data",
+            options: .init(body: ["shortCode": shortCode])
+        )
+        return response.data
     }
 
     func registerDeviceToken(_ fcmToken: String) async throws {
