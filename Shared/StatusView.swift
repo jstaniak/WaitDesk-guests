@@ -610,7 +610,9 @@ struct StatusView: View {
         notifiedAt = snapshot.party.notified_at
 
         withAnimation {
-            position = snapshot.position
+            if snapshot.position != nil || snapshot.party.status != "waiting" {
+                position = snapshot.position
+            }
         }
     }
 
