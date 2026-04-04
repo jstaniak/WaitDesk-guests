@@ -1,4 +1,2 @@
 FCM - Remaining manual steps
 Create the register-device-token Supabase edge function on the backend to persist the FCM token.
-
-periodic status update

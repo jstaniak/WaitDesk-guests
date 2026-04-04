@@ -19,6 +19,46 @@ struct CompanyData: Decodable {
     let logoData: String?
 }
 
+struct GuestVisitData: Decodable, Identifiable {
+    let companyName: String
+    let date: String
+    let status: String
+    let actualWaitTime: Int?
+    let shortCode: String?
+
+    var id: String {
+        "\(companyName)-\(date)-\(status)-\(actualWaitTime ?? -1)"
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case companyName
+        case date
+        case status
+        case actualWaitTime
+        case shortCode
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        companyName = try container.decode(String.self, forKey: .companyName)
+        date = try container.decode(String.self, forKey: .date)
+        status = try container.decode(String.self, forKey: .status)
+        shortCode = try container.decodeIfPresent(String.self, forKey: .shortCode)
+
+        if let intValue = try? container.decodeIfPresent(Int.self, forKey: .actualWaitTime) {
+            actualWaitTime = intValue
+        } else if let doubleValue = try? container.decodeIfPresent(Double.self, forKey: .actualWaitTime) {
+            actualWaitTime = Int(doubleValue.rounded())
+        } else if let stringValue = try? container.decodeIfPresent(String.self, forKey: .actualWaitTime),
+                  let parsedValue = Int(stringValue)
+        {
+            actualWaitTime = parsedValue
+        } else {
+            actualWaitTime = nil
+        }
+    }
+}
+
 final class SupabaseFunctionsClient {
     static let shared = SupabaseFunctionsClient()
 
@@ -55,6 +95,14 @@ final class SupabaseFunctionsClient {
         return response.data
     }
 
+    func fetchGuestVisits(email: String) async throws -> [GuestVisitData] {
+        let response: GuestVisitsResponse = try await supabase.functions.invoke(
+            "get-guest-visits",
+            options: .init(body: ["email": email])
+        )
+        return response.data
+    }
+
     func registerDeviceToken(_ fcmToken: String) async throws {
         try await supabase.functions.invoke(
             "register-device-token",
@@ -71,6 +119,28 @@ private struct PartyResponse: Decodable {
 private struct CompanyResponse: Decodable {
     let success: Bool
     let data: CompanyData
+}
+
+private struct GuestVisitsResponse: Decodable {
+    let success: Bool?
+    let data: [GuestVisitData]
+
+    private enum CodingKeys: String, CodingKey {
+        case success
+        case data
+    }
+
+    init(from decoder: Decoder) throws {
+        if let visits = try? [GuestVisitData](from: decoder) {
+            success = true
+            data = visits
+            return
+        }
+
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        success = try container.decodeIfPresent(Bool.self, forKey: .success)
+        data = try container.decode([GuestVisitData].self, forKey: .data)
+    }
 }
 
 private struct PositionResponse: Decodable {

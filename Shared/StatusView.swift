@@ -4,8 +4,6 @@ import Network
 import SwiftUI
 import UIKit
 
-private let partyShortCode = "7y675ykaw1"
-
 private struct StatusSnapshot {
     let party: PartyData
     let company: CompanyData
@@ -241,6 +239,8 @@ private final class ConnectivityObserver: ObservableObject {
 }
 
 struct StatusView: View {
+    let partyShortCode: String?
+
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var connectivityObserver = ConnectivityObserver()
     @State private var partyName: String = ""
@@ -261,6 +261,12 @@ struct StatusView: View {
         GuestStatus(status: status, notifiedAt: notifiedAt)
     }
 
+    private var trimmedPartyShortCode: String? {
+        guard let partyShortCode else { return nil }
+        let trimmed = partyShortCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
     private var isInitialLoading: Bool {
         !hasLoadedInitialSnapshot && partyName.isEmpty && loadError == nil
     }
@@ -270,7 +276,9 @@ struct StatusView: View {
             let metrics = StatusLayoutMetrics.make(for: geometry.size.height)
 
             Group {
-                if isInitialLoading {
+                if trimmedPartyShortCode == nil {
+                    noVisitStateView
+                } else if isInitialLoading {
                     loadingStateView
                 } else if let loadError {
                     errorStateView(loadError)
@@ -341,15 +349,16 @@ struct StatusView: View {
             wasConnected = connectivityObserver.isConnected
         }
         .task(id: refreshCycle) {
+            guard trimmedPartyShortCode != nil else { return }
             await runStatusLifecycle()
         }
         .onChange(of: scenePhase) { newPhase in
-            guard newPhase == .active else { return }
+            guard trimmedPartyShortCode != nil, newPhase == .active else { return }
             restartStatusLifecycle()
         }
         .onChange(of: connectivityObserver.isConnected) { isConnected in
             defer { wasConnected = isConnected }
-            guard isConnected, !wasConnected else { return }
+            guard trimmedPartyShortCode != nil, isConnected, !wasConnected else { return }
             restartStatusLifecycle()
         }
     }
@@ -542,6 +551,25 @@ struct StatusView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    private var noVisitStateView: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "calendar.badge.plus")
+                .font(.system(size: 40))
+                .foregroundStyle(.secondary)
+
+            Text("No visit registered")
+                .font(.system(size: 24, weight: .bold))
+                .multilineTextAlignment(.center)
+
+            Text("Please join the waitlist.")
+                .font(.system(size: 17))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(.horizontal, 24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
     private func errorStateView(_ loadError: StatusLoadError) -> some View {
         VStack(spacing: 20) {
             Image(systemName: "exclamationmark.triangle.fill")
@@ -631,7 +659,10 @@ struct StatusView: View {
     }
 
     private func fetchPartyData() async throws -> PartyData {
-        try await SupabaseFunctionsClient.shared.fetchPartyData(shortCode: partyShortCode)
+        guard let shortCode = trimmedPartyShortCode else {
+            throw CancellationError()
+        }
+        return try await SupabaseFunctionsClient.shared.fetchPartyData(shortCode: shortCode)
     }
 
     private func fetchCompanyData(shortCode: String) async throws -> CompanyData {
@@ -639,7 +670,10 @@ struct StatusView: View {
     }
 
     private func fetchPosition() async throws -> Int? {
-        try await SupabaseFunctionsClient.shared.fetchPosition(shortCode: partyShortCode)
+        guard let shortCode = trimmedPartyShortCode else {
+            throw CancellationError()
+        }
+        return try await SupabaseFunctionsClient.shared.fetchPosition(shortCode: shortCode)
     }
 
     private func loadCompanyLogo(from logoData: String?) async -> UIImage? {
@@ -686,13 +720,13 @@ struct StatusView: View {
 
     @MainActor
     private func cancelQueue() async {
-        guard !isCancelling else { return }
+        guard !isCancelling, let shortCode = trimmedPartyShortCode else { return }
 
         isCancelling = true
         defer { isCancelling = false }
 
         do {
-            try await SupabaseFunctionsClient.shared.cancelQueue(shortCode: partyShortCode)
+            try await SupabaseFunctionsClient.shared.cancelQueue(shortCode: shortCode)
 
             withAnimation {
                 status = "cancelled"
@@ -706,5 +740,5 @@ struct StatusView: View {
 }
 
 #Preview {
-    StatusView()
+    StatusView(partyShortCode: "7y675ykaw1")
 }
