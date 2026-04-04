@@ -58,6 +58,7 @@
 		3ACC5A202F7B075C00D53553 /* Exceptions for "Shared" folder in "WaitDesk-guests" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				EdgeFunctionError.swift,
 				FirebaseMessagingClient.swift,
 				StatusView.swift,
 				SupabaseConfig.swift,

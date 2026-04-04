@@ -11,54 +11,7 @@ private struct StatusSnapshot {
     let position: Int?
 }
 
-private enum StatusLoadError: Equatable {
-    case notFound
-    case rateLimited
-    case generic
-
-    init(error: Error) {
-        guard let functionsError = error as? FunctionsError else {
-            self = .generic
-            return
-        }
-
-        switch functionsError {
-        case let .httpError(code, _):
-            switch code {
-            case 404:
-                self = .notFound
-            case 429:
-                self = .rateLimited            
-            default:
-                self = .generic
-            }
-        case .relayError:
-            self = .generic
-        }
-    }
-
-    var title: String {
-        switch self {
-        case .notFound:
-            return "Not found"
-        case .rateLimited:
-            return "Too many requests"
-        case .generic:
-            return "Something went wrong"
-        }
-    }
-
-    var message: String {
-        switch self {
-        case .notFound:
-            return "We couldn't find the requested waitlist information."
-        case .rateLimited:
-            return "Please wait a moment and try again."
-        case .generic:
-            return "We couldn't load your latest waitlist status right now."
-        }
-    }
-}
+private typealias StatusLoadError = EdgeFunctionError
 
 private enum GuestStatus: Equatable {
     case waiting
@@ -257,6 +210,8 @@ struct StatusView: View {
     @State private var isCancelling = false
     @State private var cancelErrorMessage: String?
 
+    private static let statusPollingIntervalNanoseconds: UInt64 = 60_000_000_000
+
     private var guestStatus: GuestStatus {
         GuestStatus(status: status, notifiedAt: notifiedAt)
     }
@@ -409,9 +364,23 @@ struct StatusView: View {
             try await channel.subscribeWithError()
             connectionStatus = "Listening"
 
-            for await _ in stream {
-                try Task.checkCancellation()
-                _ = await refreshStatusSnapshot()
+            try await withThrowingTaskGroup(of: Void.self) { group in
+                group.addTask {
+                    for await _ in stream {
+                        try Task.checkCancellation()
+                        _ = await refreshStatusSnapshot()
+                    }
+                }
+
+                group.addTask {
+                    while true {
+                        try await Task.sleep(nanoseconds: Self.statusPollingIntervalNanoseconds)
+                        _ = await refreshStatusSnapshot()
+                    }
+                }
+
+                try await group.next()
+                group.cancelAll()
             }
         } catch is CancellationError {
             connectionStatus = hasLoadedInitialSnapshot ? "Reconnecting..." : "Loading..."
@@ -619,9 +588,9 @@ struct StatusView: View {
         } catch {
             guard !Task.isCancelled else { return nil }
 
-            let statusLoadError = StatusLoadError(error: error)
+            let statusLoadError = StatusLoadError(error)
 
-            if hasLoadedInitialSnapshot || statusLoadError != .generic {
+            if hasLoadedInitialSnapshot || !statusLoadError.isGeneric {
                 apply(error: statusLoadError)
                 connectionStatus = "Fetch error: \(error.localizedDescription)"
             } else {

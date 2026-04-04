@@ -10,10 +10,9 @@ struct ContentView: View {
     }
 
     @AppStorage("profile.email") private var email = ""
+    @Environment(\.scenePhase) private var scenePhase
+    @ObservedObject private var visitsService = GuestVisitsService.shared
     @State private var selectedTab: Tab = .status
-    @State private var partyShortCode: String?
-    @State private var isLoadingPartyShortCode = false
-    @State private var partyShortCodeErrorMessage: String?
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -42,13 +41,13 @@ struct ContentView: View {
                 .tag(Tab.profile)
         }
         .task(id: trimmedEmail) {
-            guard selectedTab == .status else { return }
-            await loadPartyShortCode()
+            visitsService.start(email: trimmedEmail)
         }
-        .onChange(of: selectedTab) { newTab in
-            guard newTab == .status else { return }
-            Task {
-                await loadPartyShortCode()
+        .onChange(of: scenePhase) { newPhase in
+            if newPhase == .active {
+                visitsService.restart()
+            } else if newPhase == .background {
+                visitsService.stop()
             }
         }
     }
@@ -61,61 +60,22 @@ struct ContentView: View {
                 systemImage: "envelope.badge",
                 message: "Add your email in the Profile tab to load your waitlist status."
             )
-        } else if isLoadingPartyShortCode {
+        } else if visitsService.isLoading {
             ProgressView("Loading your status...")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if let partyShortCodeErrorMessage {
+        } else if let error = visitsService.error, visitsService.visits.isEmpty {
             EmptyStateView(
-                title: "Couldn't load status",
+                title: error.title,
                 systemImage: "exclamationmark.triangle",
-                message: partyShortCodeErrorMessage
+                message: error.message
             )
         } else {
-            StatusView(partyShortCode: partyShortCode)
+            StatusView(partyShortCode: visitsService.currentVisitShortCode)
         }
     }
 
     private var trimmedEmail: String {
         email.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    @MainActor
-    private func loadPartyShortCode() async {
-        guard !trimmedEmail.isEmpty else {
-            partyShortCode = nil
-            partyShortCodeErrorMessage = nil
-            isLoadingPartyShortCode = false
-            return
-        }
-
-        isLoadingPartyShortCode = true
-        partyShortCodeErrorMessage = nil
-
-        do {
-            let guestVisits = try await SupabaseFunctionsClient.shared.fetchGuestVisits(email: trimmedEmail)
-            partyShortCode = guestVisits.first?.shortCode?.trimmingCharacters(in: .whitespacesAndNewlines)
-
-            if partyShortCode?.isEmpty == true {
-                partyShortCode = nil
-            }
-        } catch {
-            partyShortCode = nil
-            partyShortCodeErrorMessage = error.localizedDescription
-        }
-
-        isLoadingPartyShortCode = false
-    }
-}
-
-private struct PlaceholderTabView: View {
-    let title: String
-
-    var body: some View {
-        NavigationStack {
-            Text("Empty page")
-                .foregroundStyle(.secondary)
-                .navigationTitle(title)
-        }
     }
 }
 
@@ -144,30 +104,21 @@ private struct EmptyStateView: View {
 }
 
 private struct VisitsView: View {
-    @AppStorage("profile.email") private var email = ""
-    @State private var visits: [GuestVisitData] = []
-    @State private var isLoading = false
-    @State private var errorMessage: String?
+    @ObservedObject private var visitsService = GuestVisitsService.shared
 
     var body: some View {
         NavigationStack {
             Group {
-                if trimmedEmail.isEmpty {
-                    EmptyStateView(
-                        title: "No email in profile",
-                        systemImage: "envelope.badge",
-                        message: "Add your email in the Profile tab to load your visit history."
-                    )
-                } else if isLoading && visits.isEmpty {
+                if visitsService.isLoading && visitsService.nonWaitingVisits.isEmpty {
                     ProgressView("Loading visits...")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if let errorMessage, visits.isEmpty {
+                } else if let error = visitsService.error, visitsService.nonWaitingVisits.isEmpty {
                     EmptyStateView(
-                        title: "Couldn't load visits",
+                        title: error.title,
                         systemImage: "exclamationmark.triangle",
-                        message: errorMessage
+                        message: error.message
                     )
-                } else if visits.isEmpty {
+                } else if visitsService.nonWaitingVisits.isEmpty {
                     EmptyStateView(
                         title: "No visits yet",
                         systemImage: "calendar.badge.clock",
@@ -176,7 +127,7 @@ private struct VisitsView: View {
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 12) {
-                            ForEach(Array(visits.enumerated()), id: \.offset) { _, visit in
+                            ForEach(Array(visitsService.nonWaitingVisits.enumerated()), id: \.offset) { _, visit in
                                 VStack(alignment: .leading, spacing: 12) {
                                     LabeledContent("Venue", value: visit.companyName)
                                     LabeledContent("Date", value: formattedDate(visit.date))
@@ -193,40 +144,10 @@ private struct VisitsView: View {
                     }
                 }
             }
-            .task(id: trimmedEmail) {
-                await loadVisits()
-            }
             .refreshable {
-                await loadVisits()
+                await visitsService.refresh()
             }
         }
-    }
-
-    private var trimmedEmail: String {
-        email.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    @MainActor
-    private func loadVisits() async {
-        guard !trimmedEmail.isEmpty else {
-            visits = []
-            errorMessage = nil
-            isLoading = false
-            return
-        }
-
-        isLoading = true
-        errorMessage = nil
-
-        do {
-            visits = try await SupabaseFunctionsClient.shared.fetchGuestVisits(email: trimmedEmail)
-                .filter { $0.status.caseInsensitiveCompare("waiting") != .orderedSame }
-        } catch {
-            visits = []
-            errorMessage = error.localizedDescription
-        }
-
-        isLoading = false
     }
 
     private func formattedWaitTime(_ waitTime: Int?) -> String {
@@ -265,30 +186,29 @@ private struct JoinWaitlistView: View {
     @AppStorage("profile.name") private var name = ""
     @AppStorage("profile.email") private var email = ""
     @AppStorage("profile.phoneNumber") private var phoneNumber = ""
+    @ObservedObject private var visitsService = GuestVisitsService.shared
     @State private var partySize = 1
     @State private var note = ""
     @State private var selectedVenue = ""
-    @State private var venues: [String] = []
-    @State private var isLoadingVenues = false
 
     var body: some View {
         NavigationStack {
             Form {
                 Section("Venue") {
                     Picker("Venue", selection: $selectedVenue) {
-                        if isLoadingVenues {
+                        if visitsService.isLoading && visitsService.servedVenueNames.isEmpty {
                             Text("Loading venues...").tag("")
-                        } else if venues.isEmpty {
+                        } else if visitsService.servedVenueNames.isEmpty {
                             Text("No venues available").tag("")
                         } else {
                             Text("Select a venue").tag("")
 
-                            ForEach(venues, id: \.self) { venue in
+                            ForEach(visitsService.servedVenueNames, id: \.self) { venue in
                                 Text(venue).tag(venue)
                             }
                         }
                     }
-                    .disabled(isLoadingVenues || venues.isEmpty)
+                    .disabled(visitsService.isLoading || visitsService.servedVenueNames.isEmpty)
                 }
 
                 Section("Guest Details") {
@@ -327,51 +247,12 @@ private struct JoinWaitlistView: View {
                 .background(Color(.systemBackground))
                 .disabled(selectedVenue.isEmpty)
             }
-            .task(id: trimmedEmail) {
-                await loadVenues()
+            .onChange(of: visitsService.servedVenueNames) { venues in
+                if !venues.contains(selectedVenue) {
+                    selectedVenue = ""
+                }
             }
         }
-    }
-
-    private var trimmedEmail: String {
-        email.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    @MainActor
-    private func loadVenues() async {
-        guard !trimmedEmail.isEmpty else {
-            venues = []
-            selectedVenue = ""
-            isLoadingVenues = false
-            return
-        }
-
-        isLoadingVenues = true
-
-        do {
-            let guestVisits = try await SupabaseFunctionsClient.shared.fetchGuestVisits(email: trimmedEmail)
-            let uniqueVenues = Array(
-                Set(
-                    guestVisits
-                        .filter { $0.status.caseInsensitiveCompare("served") == .orderedSame }
-                        .map(\.companyName)
-                        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                        .filter { !$0.isEmpty }
-                )
-            )
-            .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
-
-            venues = uniqueVenues
-
-            if !venues.contains(selectedVenue) {
-                selectedVenue = ""
-            }
-        } catch {
-            venues = []
-            selectedVenue = ""
-        }
-
-        isLoadingVenues = false
     }
 }
 
@@ -387,19 +268,16 @@ private struct ProfileView: View {
                     .textContentType(.name)
 
                 TextField("Email", text: $email)
-                    .keyboardType(.emailAddress)
                     .textContentType(.emailAddress)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
+                    .keyboardType(.emailAddress)
+                    .autocapitalization(.none)
+                    .disableAutocorrection(true)
 
                 TextField("Phone Number", text: $phoneNumber)
-                    .keyboardType(.phonePad)
                     .textContentType(.telephoneNumber)
+                    .keyboardType(.phonePad)
             }
+            .navigationTitle("Profile")
         }
     }
-}
-
-#Preview {
-    ContentView()
 }
