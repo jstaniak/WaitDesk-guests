@@ -207,6 +207,8 @@ struct StatusView: View {
     @State private var refreshCycle = 0
     @State private var hasLoadedInitialSnapshot = false
     @State private var wasConnected = true
+    @State private var pollingTask: Task<Void, Never>?
+    @State private var refreshRequestID = 0
     @State private var isCancelling = false
     @State private var cancelErrorMessage: String?
 
@@ -239,51 +241,58 @@ struct StatusView: View {
                     errorStateView(loadError)
                 } else {
                     ScrollView(showsIndicators: false) {
-                        VStack(spacing: metrics.contentSpacing) {
-                            if companyLogo != nil || !companyName.isEmpty {
-                                companyHeader(metrics: metrics)
-                            }
+                        VStack {
+                            Spacer(minLength: 0)
 
-                            if !partyName.isEmpty {
-                                welcomeText(fontSize: metrics.welcomeTextSize)
-
-                                if guestStatus == .waiting {
-                                    Text("Your position updates automatically as the queue moves.")
-                                        .font(.system(size: 17))
-                                        .foregroundStyle(.secondary)
-                                        .multilineTextAlignment(.center)
-                                        .padding(.horizontal, 16)
+                            VStack(spacing: metrics.contentSpacing) {
+                                if companyLogo != nil || !companyName.isEmpty {
+                                    companyHeader(metrics: metrics)
                                 }
 
-                                statusCircle(size: metrics.circleSize)
+                                if !partyName.isEmpty {
+                                    welcomeText(fontSize: metrics.welcomeTextSize)
 
-                                VStack(spacing: 8) {
-                                    Text(guestStatus.title)
-                                        .font(.system(size: 24, weight: .bold))
-                                        .multilineTextAlignment(.center)
-
-                                    if !guestStatus.message.isEmpty {
-                                        Text(guestStatus.message)
+                                    if guestStatus == .waiting {
+                                        Text("Your position updates automatically as the queue moves.")
                                             .font(.system(size: 17))
                                             .foregroundStyle(.secondary)
                                             .multilineTextAlignment(.center)
+                                            .padding(.horizontal, 16)
+                                    }
+
+                                    statusCircle(size: metrics.circleSize)
+
+                                    VStack(spacing: 8) {
+                                        Text(guestStatus.title)
+                                            .font(.system(size: 24, weight: .bold))
+                                            .multilineTextAlignment(.center)
+
+                                        if !guestStatus.message.isEmpty {
+                                            Text(guestStatus.message)
+                                                .font(.system(size: 17))
+                                                .foregroundStyle(.secondary)
+                                                .multilineTextAlignment(.center)
+                                        }
+                                    }
+                                    .padding(.horizontal, 16)
+
+                                    if guestStatus.showsInfoCard {
+                                        infoCard
                                     }
                                 }
-                                .padding(.horizontal, 16)
-
-                                if guestStatus.showsInfoCard {
-                                    infoCard
-                                }
                             }
+                            .frame(maxWidth: .infinity)
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 24)
+
+                            Spacer(minLength: 0)
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.horizontal, 24)
-                        .padding(.top, metrics.topPadding)
-                        .padding(.bottom, 24)
+                        .frame(minHeight: geometry.size.height)
                     }
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color(.systemBackground))
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if !partyName.isEmpty && guestStatus.showsLeaveQueueButton && !isInitialLoading && loadError == nil {
@@ -318,10 +327,12 @@ struct StatusView: View {
         }
     }
 
+    @MainActor
     private func restartStatusLifecycle() {
         refreshCycle += 1
     }
 
+    @MainActor
     private func runStatusLifecycle() async {
         var data: PartyData?
 
@@ -346,13 +357,61 @@ struct StatusView: View {
 
         guard let data else { return }
         hasLoadedInitialSnapshot = true
+        startPolling()
 
+        defer {
+            stopPolling()
+        }
+
+        while !Task.isCancelled {
+            await runBroadcastLoop(for: data.businessShortCode)
+            guard !Task.isCancelled else { return }
+
+            connectionStatus = "Reconnecting..."
+
+            do {
+                try await Task.sleep(nanoseconds: 2_000_000_000)
+            } catch {
+                return
+            }
+        }
+    }
+
+    @MainActor
+    private func startPolling() {
+        stopPolling()
+        pollingTask = Task {
+            await runPollingLoop()
+        }
+    }
+
+    @MainActor
+    private func stopPolling() {
+        pollingTask?.cancel()
+        pollingTask = nil
+    }
+
+    @MainActor
+    private func runPollingLoop() async {
+        while !Task.isCancelled {
+            do {
+                try await Task.sleep(nanoseconds: Self.statusPollingIntervalNanoseconds)
+            } catch {
+                return
+            }
+
+            _ = await refreshStatusSnapshot()
+        }
+    }
+
+    @MainActor
+    private func runBroadcastLoop(for businessShortCode: String) async {
         do {
             try Task.checkCancellation()
             await supabase.realtimeV2.connect()
             connectionStatus = "Subscribing..."
 
-            let channel = supabase.realtimeV2.channel("parties:\(data.businessShortCode)")
+            let channel = supabase.realtimeV2.channel("parties:\(businessShortCode)")
             let stream = await channel.broadcastStream(event: "*")
 
             defer {
@@ -364,23 +423,9 @@ struct StatusView: View {
             try await channel.subscribeWithError()
             connectionStatus = "Listening"
 
-            try await withThrowingTaskGroup(of: Void.self) { group in
-                group.addTask {
-                    for await _ in stream {
-                        try Task.checkCancellation()
-                        _ = await refreshStatusSnapshot()
-                    }
-                }
-
-                group.addTask {
-                    while true {
-                        try await Task.sleep(nanoseconds: Self.statusPollingIntervalNanoseconds)
-                        _ = await refreshStatusSnapshot()
-                    }
-                }
-
-                try await group.next()
-                group.cancelAll()
+            for await _ in stream {
+                try Task.checkCancellation()
+                _ = await refreshStatusSnapshot()
             }
         } catch is CancellationError {
             connectionStatus = hasLoadedInitialSnapshot ? "Reconnecting..." : "Loading..."
@@ -561,7 +606,11 @@ struct StatusView: View {
     }
 
     @discardableResult
+    @MainActor
     private func refreshStatusSnapshot() async -> PartyData? {
+        refreshRequestID += 1
+        let requestID = refreshRequestID
+
         do {
             async let partyTask = fetchPartyData()
             async let positionTask = fetchPosition()
@@ -580,6 +629,10 @@ struct StatusView: View {
             )
 
             try Task.checkCancellation()
+            guard requestID == refreshRequestID else { return nil }
+            guard !(snapshot.party.status == "waiting" && snapshot.position == nil) else {
+                return nil
+            }
             apply(snapshot)
             connectionStatus = "Loaded"
             return snapshot.party
@@ -587,6 +640,7 @@ struct StatusView: View {
             return nil
         } catch {
             guard !Task.isCancelled else { return nil }
+            guard requestID == refreshRequestID else { return nil }
 
             let statusLoadError = StatusLoadError(error)
 
@@ -601,6 +655,7 @@ struct StatusView: View {
         }
     }
 
+    @MainActor
     private func apply(_ snapshot: StatusSnapshot) {
         loadError = nil
         partyName = snapshot.party.name
@@ -610,12 +665,15 @@ struct StatusView: View {
         notifiedAt = snapshot.party.notified_at
 
         withAnimation {
-            if snapshot.position != nil || snapshot.party.status != "waiting" {
+            if snapshot.party.status == "waiting" {
                 position = snapshot.position
+            } else {
+                position = nil
             }
         }
     }
 
+    @MainActor
     private func apply(error: StatusLoadError) {
         loadError = error
         partyName = ""
