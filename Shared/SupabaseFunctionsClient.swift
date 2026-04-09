@@ -95,10 +95,20 @@ final class SupabaseFunctionsClient {
         return response.data
     }
 
-    func fetchGuestVisits(email: String) async throws -> [GuestVisitData] {
+    func fetchGuestVisits() async throws -> [GuestVisitData] {
+        let session: Session
+
+        do {
+            session = try await supabase.auth.session
+        } catch {
+            throw EdgeFunctionError.unauthorized
+        }
+
         let response: GuestVisitsResponse = try await supabase.functions.invoke(
             "get-guest-visits",
-            options: .init(body: ["email": email])
+            options: .init(
+                headers: ["Authorization": "Bearer \(session.accessToken)"]
+            )
         )
         return response.data
     }

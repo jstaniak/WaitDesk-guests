@@ -9,7 +9,6 @@ final class GuestVisitsService: ObservableObject {
     @Published private(set) var isLoading = false
     @Published private(set) var error: EdgeFunctionError?
 
-    private var email = ""
     private var lifecycleTask: Task<Void, Never>?
 
     private static let pollingInterval: UInt64 = 60_000_000_000
@@ -42,20 +41,13 @@ final class GuestVisitsService: ObservableObject {
 
     // MARK: - Lifecycle
 
-    func start(email: String) {
-        let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed != self.email else { return }
-
-        stop()
-        self.email = trimmed
-
-        guard !trimmed.isEmpty else {
-            visits = []
-            error = nil
-            isLoading = false
+    func start() {
+        guard GuestAuthService.shared.isAuthenticated else {
+            reset()
             return
         }
 
+        guard lifecycleTask == nil else { return }
         lifecycleTask = Task { await runLifecycle() }
     }
 
@@ -65,13 +57,27 @@ final class GuestVisitsService: ObservableObject {
     }
 
     func restart() {
-        guard !email.isEmpty else { return }
+        guard GuestAuthService.shared.isAuthenticated else {
+            reset()
+            return
+        }
         stop()
         lifecycleTask = Task { await runLifecycle() }
     }
 
     func refresh() async {
+        guard GuestAuthService.shared.isAuthenticated else {
+            reset()
+            return
+        }
         await fetchVisits()
+    }
+
+    func reset() {
+        stop()
+        visits = []
+        error = nil
+        isLoading = false
     }
 
     // MARK: - Private
@@ -95,20 +101,31 @@ final class GuestVisitsService: ObservableObject {
     }
 
     private func fetchVisits() async {
-        guard !email.isEmpty else { return }
+        guard GuestAuthService.shared.isAuthenticated else {
+            reset()
+            return
+        }
 
         let wasEmpty = visits.isEmpty
         if wasEmpty { isLoading = true }
 
         do {
-            visits = try await SupabaseFunctionsClient.shared.fetchGuestVisits(email: email)
+            visits = try await SupabaseFunctionsClient.shared.fetchGuestVisits()
             error = nil
         } catch is CancellationError {
             return
         } catch {
             guard !Task.isCancelled else { return }
-            self.error = EdgeFunctionError(error)
-            if wasEmpty { visits = [] }
+            let edgeError = EdgeFunctionError(error)
+            self.error = edgeError
+            if wasEmpty || edgeError.requiresReauthentication { visits = [] }
+
+            if edgeError.requiresReauthentication {
+                stop()
+                Task {
+                    await GuestAuthService.shared.handleExpiredOrInvalidSession()
+                }
+            }
         }
 
         isLoading = false

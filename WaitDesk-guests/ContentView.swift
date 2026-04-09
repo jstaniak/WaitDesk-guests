@@ -9,12 +9,42 @@ struct ContentView: View {
         case profile
     }
 
-    @AppStorage("profile.email") private var email = ""
     @Environment(\.scenePhase) private var scenePhase
+    @ObservedObject private var authService = GuestAuthService.shared
     @ObservedObject private var visitsService = GuestVisitsService.shared
     @State private var selectedTab: Tab = .status
 
     var body: some View {
+        Group {
+            if authService.isLoadingSession {
+                ProgressView("Checking your session...")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if authService.isAuthenticated {
+                authenticatedApp
+            } else {
+                GuestVerificationView()
+            }
+        }
+        .task(id: authService.authenticatedEmail) {
+            if authService.isAuthenticated {
+                visitsService.start()
+            } else {
+                selectedTab = .status
+                visitsService.reset()
+            }
+        }
+        .onChange(of: scenePhase) { newPhase in
+            if newPhase == .active {
+                if authService.isAuthenticated {
+                    visitsService.restart()
+                }
+            } else if newPhase == .background {
+                visitsService.stop()
+            }
+        }
+    }
+
+    private var authenticatedApp: some View {
         TabView(selection: $selectedTab) {
             statusTab
                 .tabItem {
@@ -40,27 +70,11 @@ struct ContentView: View {
                 }
                 .tag(Tab.profile)
         }
-        .task(id: trimmedEmail) {
-            visitsService.start(email: trimmedEmail)
-        }
-        .onChange(of: scenePhase) { newPhase in
-            if newPhase == .active {
-                visitsService.restart()
-            } else if newPhase == .background {
-                visitsService.stop()
-            }
-        }
     }
 
     @ViewBuilder
     private var statusTab: some View {
-        if trimmedEmail.isEmpty {
-            EmptyStateView(
-                title: "No email in profile",
-                systemImage: "envelope.badge",
-                message: "Add your email in the Profile tab to load your waitlist status."
-            )
-        } else if visitsService.isLoading {
+        if visitsService.isLoading {
             ProgressView("Loading your status...")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if let error = visitsService.error, visitsService.visits.isEmpty {
@@ -80,9 +94,64 @@ struct ContentView: View {
             )
         }
     }
+}
 
-    private var trimmedEmail: String {
-        email.trimmingCharacters(in: .whitespacesAndNewlines)
+private struct GuestVerificationView: View {
+    @ObservedObject private var authService = GuestAuthService.shared
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Text("Verify your email to unlock your waitlist status, visits, and profile on this device.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
+                Section("Email Verification") {
+                    if authService.needsReauthentication {
+                        Text("Your session expired. Request a new one-time code to keep using the app.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    TextField("Email", text: $authService.emailAddress)
+                        .textContentType(.emailAddress)
+                        .keyboardType(.emailAddress)
+                        .autocapitalization(.none)
+                        .disableAutocorrection(true)
+
+                    if authService.isCodeSent {
+                        TextField("One-Time Code", text: $authService.otpCode)
+                            .textContentType(.oneTimeCode)
+                            .keyboardType(.numberPad)
+                    }
+
+                    if let errorMessage = authService.errorMessage {
+                        Text(errorMessage)
+                            .font(.footnote)
+                            .foregroundStyle(.red)
+                    }
+
+                    Button(authService.isCodeSent ? "Resend Code" : "Send Code") {
+                        Task {
+                            await authService.sendOTP()
+                        }
+                    }
+                    .disabled(authService.isSendingCode || authService.isVerifyingCode)
+
+                    if authService.isCodeSent {
+                        Button("Verify Code") {
+                            Task {
+                                await authService.verifyOTP()
+                            }
+                        }
+                        .disabled(authService.isSendingCode || authService.isVerifyingCode)
+                    }
+                }
+            }
+            .navigationTitle("Verify Email")
+        }
     }
 }
 
@@ -265,20 +334,29 @@ private struct JoinWaitlistView: View {
 
 private struct ProfileView: View {
     @AppStorage("profile.name") private var name = ""
-    @AppStorage("profile.email") private var email = ""
     @AppStorage("profile.phoneNumber") private var phoneNumber = ""
+    @ObservedObject private var authService = GuestAuthService.shared
 
     var body: some View {
         NavigationStack {
             Form {
+                Section("Account") {
+                    TextField("Email", text: .constant(authService.authenticatedEmail ?? ""))
+                        .disabled(true)
+
+                    Text("Your email is verified on this device, so the app opens directly until you sign out or the session expires.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+
+                    Button("Sign Out", role: .destructive) {
+                        Task {
+                            await authService.signOut()
+                        }
+                    }
+                }
+
                 TextField("Name", text: $name)
                     .textContentType(.name)
-
-                TextField("Email", text: $email)
-                    .textContentType(.emailAddress)
-                    .keyboardType(.emailAddress)
-                    .autocapitalization(.none)
-                    .disableAutocorrection(true)
 
                 TextField("Phone Number", text: $phoneNumber)
                     .textContentType(.telephoneNumber)
