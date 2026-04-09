@@ -70,6 +70,7 @@ struct ContentView: View {
                 }
                 .tag(Tab.profile)
         }
+        .tint(AppTheme.primary)
     }
 
     @ViewBuilder
@@ -101,56 +102,92 @@ private struct GuestVerificationView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    Text("Verify your email to unlock your waitlist status, visits, and profile on this device.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
+            ZStack {
+                AppBackground()
 
-                Section("Email Verification") {
-                    if authService.needsReauthentication {
-                        Text("Your session expired. Request a new one-time code to keep using the app.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 20) {
+                        ScreenHeader(
+                            eyebrow: "WaitDesk for guests",
+                            title: authService.isCodeSent ? "Check your inbox" : "Verify your email",
+                            message: "Verify your email to unlock live waitlist status, visit history, and your saved profile on this device.",
+                            systemImage: "envelope.badge.shield.half.filled"
+                        )
 
-                    TextField("Email", text: $authService.emailAddress)
-                        .textContentType(.emailAddress)
-                        .keyboardType(.emailAddress)
-                        .autocapitalization(.none)
-                        .disableAutocorrection(true)
+                        AppCard {
+                            VStack(alignment: .leading, spacing: 18) {
+                                if authService.needsReauthentication {
+                                    BannerView(
+                                        title: "Session expired",
+                                        message: "Request a new one-time code to keep using the app.",
+                                        systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90"
+                                    )
+                                }
 
-                    if authService.isCodeSent {
-                        TextField("One-Time Code", text: $authService.otpCode)
-                            .textContentType(.oneTimeCode)
-                            .keyboardType(.numberPad)
-                    }
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Email")
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(.secondary)
 
-                    if let errorMessage = authService.errorMessage {
-                        Text(errorMessage)
-                            .font(.footnote)
-                            .foregroundStyle(.red)
-                    }
+                                    TextField("name@example.com", text: $authService.emailAddress)
+                                        .textContentType(.emailAddress)
+                                        .keyboardType(.emailAddress)
+                                        .autocapitalization(.none)
+                                        .disableAutocorrection(true)
+                                        .appInputStyle()
+                                }
 
-                    Button(authService.isCodeSent ? "Resend Code" : "Send Code") {
-                        Task {
-                            await authService.sendOTP()
-                        }
-                    }
-                    .disabled(authService.isSendingCode || authService.isVerifyingCode)
+                                if authService.isCodeSent {
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        Text("One-Time Code")
+                                            .font(.subheadline.weight(.semibold))
+                                            .foregroundStyle(.secondary)
 
-                    if authService.isCodeSent {
-                        Button("Verify Code") {
-                            Task {
-                                await authService.verifyOTP()
+                                        TextField("6-digit code", text: $authService.otpCode)
+                                            .textContentType(.oneTimeCode)
+                                            .keyboardType(.numberPad)
+                                            .appInputStyle()
+                                    }
+                                }
+
+                                if let errorMessage = authService.errorMessage {
+                                    BannerView(
+                                        title: "Something went wrong",
+                                        message: errorMessage,
+                                        systemImage: "exclamationmark.triangle.fill",
+                                        tint: .red
+                                    )
+                                }
+
+                                VStack(spacing: 12) {
+                                    Button(authService.isCodeSent ? "Resend Code" : "Send Code") {
+                                        Task {
+                                            await authService.sendOTP()
+                                        }
+                                    }
+                                    .buttonStyle(PrimaryActionButtonStyle())
+                                    .disabled(authService.isSendingCode || authService.isVerifyingCode)
+
+                                    if authService.isCodeSent {
+                                        Button("Verify Code") {
+                                            Task {
+                                                await authService.verifyOTP()
+                                            }
+                                        }
+                                        .buttonStyle(SecondaryActionButtonStyle())
+                                        .disabled(authService.isSendingCode || authService.isVerifyingCode)
+                                    }
+                                }
                             }
                         }
-                        .disabled(authService.isSendingCode || authService.isVerifyingCode)
                     }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 24)
                 }
             }
-            .navigationTitle("Verify Email")
+            .navigationTitle("Login")
+            .navigationBarTitleDisplayMode(.inline)
+            .tint(AppTheme.primary)
         }
     }
 }
@@ -184,42 +221,91 @@ private struct VisitsView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if visitsService.isLoading && visitsService.nonWaitingVisits.isEmpty {
-                    ProgressView("Loading visits...")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if let error = visitsService.error, visitsService.nonWaitingVisits.isEmpty {
-                    EmptyStateView(
-                        title: error.title,
-                        systemImage: "exclamationmark.triangle",
-                        message: error.message
-                    )
-                } else if visitsService.nonWaitingVisits.isEmpty {
-                    EmptyStateView(
-                        title: "No visits yet",
-                        systemImage: "calendar.badge.clock",
-                        message: "Your previous waitlist visits will appear here."
-                    )
-                } else {
-                    ScrollView {
-                        LazyVStack(spacing: 12) {
-                            ForEach(Array(visitsService.nonWaitingVisits.enumerated()), id: \.offset) { _, visit in
-                                VStack(alignment: .leading, spacing: 12) {
-                                    LabeledContent("Venue", value: visit.companyName)
-                                    LabeledContent("Date", value: formattedDate(visit.date))
-                                    LabeledContent("Status", value: visit.status)
-                                    LabeledContent("Wait Time", value: formattedWaitTime(visit.actualWaitTime))
+            ZStack {
+                AppBackground()
+
+                Group {
+                    if visitsService.isLoading && visitsService.nonWaitingVisits.isEmpty {
+                        ProgressView("Loading visits...")
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if let error = visitsService.error, visitsService.nonWaitingVisits.isEmpty {
+                        EmptyStateView(
+                            title: error.title,
+                            systemImage: "exclamationmark.triangle",
+                            message: error.message
+                        )
+                    } else if visitsService.nonWaitingVisits.isEmpty {
+                        EmptyStateView(
+                            title: "No visits yet",
+                            systemImage: "calendar.badge.clock",
+                            message: "Your previous waitlist visits will appear here."
+                        )
+                    } else {
+                        ScrollView(showsIndicators: false) {
+                            VStack(spacing: 18) {
+                                ScreenHeader(
+                                    eyebrow: "VISIT HISTORY",
+                                    title: "Your recent visits",
+                                    message: "See where you've been, how long you waited, and how each visit ended."
+                                )
+
+                                AppCard {
+                                    HStack(spacing: 12) {
+                                        StatPill(title: "Completed", value: "\(visitsService.nonWaitingVisits.count)")
+                                        StatPill(title: "Average wait", value: averageWaitLabel)
+                                        StatPill(title: "Latest", value: latestVenueName)
+                                    }
                                 }
-                                .padding()
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(Color(.secondarySystemBackground))
-                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+                                LazyVStack(spacing: 14) {
+                                    ForEach(visitsService.nonWaitingVisits) { visit in
+                                        AppCard {
+                                            VStack(alignment: .leading, spacing: 14) {
+                                                HStack(alignment: .top, spacing: 12) {
+                                                    VStack(alignment: .leading, spacing: 6) {
+                                                        Text(visit.companyName)
+                                                            .font(.headline)
+
+                                                        Text(formattedDate(visit.date))
+                                                            .font(.subheadline)
+                                                            .foregroundStyle(.secondary)
+                                                    }
+
+                                                    Spacer(minLength: 0)
+
+                                                    StatusBadge(
+                                                        label: formattedStatus(visit.status),
+                                                        tint: statusTint(for: visit.status)
+                                                    )
+                                                }
+
+                                                HStack(spacing: 12) {
+                                                    InfoTile(
+                                                        title: "Wait time",
+                                                        value: formattedWaitTime(visit.actualWaitTime),
+                                                        systemImage: "clock"
+                                                    )
+
+                                                    InfoTile(
+                                                        title: "Visit code",
+                                                        value: visit.shortCode ?? "Not available",
+                                                        systemImage: "number.circle"
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 24)
                         }
-                        .padding()
                     }
                 }
             }
+            .navigationTitle("Visits")
+            .navigationBarTitleDisplayMode(.inline)
+            .tint(AppTheme.primary)
             .refreshable {
                 await visitsService.refresh()
             }
@@ -227,8 +313,36 @@ private struct VisitsView: View {
     }
 
     private func formattedWaitTime(_ waitTime: Int?) -> String {
-        guard let waitTime else { return "-" }
+        guard let waitTime else { return "Unknown" }
         return "\(waitTime) min"
+    }
+
+    private func formattedStatus(_ status: String) -> String {
+        status
+            .replacingOccurrences(of: "-", with: " ")
+            .capitalized
+    }
+
+    private func statusTint(for status: String) -> Color {
+        switch status.lowercased() {
+        case "served":
+            return Color(red: 0.16, green: 0.67, blue: 0.39)
+        case "cancelled", "no-show":
+            return Color(red: 0.30, green: 0.46, blue: 0.93)
+        default:
+            return AppTheme.primary
+        }
+    }
+
+    private var averageWaitLabel: String {
+        let waitTimes = visitsService.nonWaitingVisits.compactMap(\.actualWaitTime)
+        guard !waitTimes.isEmpty else { return "N/A" }
+        let average = waitTimes.reduce(0, +) / waitTimes.count
+        return "\(average) min"
+    }
+
+    private var latestVenueName: String {
+        visitsService.nonWaitingVisits.first?.companyName ?? "None"
     }
 
     private func formattedDate(_ value: String) -> String {
@@ -266,68 +380,199 @@ private struct JoinWaitlistView: View {
     @State private var partySize = 1
     @State private var note = ""
     @State private var selectedVenue = ""
+    @State private var venueQueueLength: Int?
+    @State private var isLoadingVenueDetails = false
+    @State private var venueDetailsError: String?
+
+    private var selectedVenueBusinessShortCode: String? {
+        visitsService.venueBusinessShortCode(for: selectedVenue)
+    }
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Venue") {
-                    Picker("Venue", selection: $selectedVenue) {
-                        if visitsService.isLoading && visitsService.servedVenueNames.isEmpty {
-                            Text("Loading venues...").tag("")
-                        } else if visitsService.servedVenueNames.isEmpty {
-                            Text("No venues available").tag("")
-                        } else {
-                            Text("Select a venue").tag("")
+            ZStack {
+                AppBackground()
 
-                            ForEach(visitsService.servedVenueNames, id: \.self) { venue in
-                                Text(venue).tag(venue)
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 20) {
+                        ScreenHeader(
+                            eyebrow: "JOIN AGAIN",
+                            title: "Get back in line faster",
+                            message: "Pick a venue you've already visited, confirm your party details, and join the waitlist in seconds.",
+                            systemImage: "person.3.sequence.fill"
+                        )
+
+                        AppCard {
+                            VStack(alignment: .leading, spacing: 14) {
+                                SectionLabel(title: "Venue", subtitle: "Only previously served venues are available right now.")
+
+                                Picker("Venue", selection: $selectedVenue) {
+                                    if visitsService.isLoading && visitsService.servedVenueNames.isEmpty {
+                                        Text("Loading venues...").tag("")
+                                    } else if visitsService.servedVenueNames.isEmpty {
+                                        Text("No venues available").tag("")
+                                    } else {
+                                        Text("Select a venue").tag("")
+
+                                        ForEach(visitsService.servedVenueNames, id: \.self) { venue in
+                                            Text(venue).tag(venue)
+                                        }
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                                .disabled(visitsService.isLoading || visitsService.servedVenueNames.isEmpty)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 14)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                        .fill(Color.white.opacity(0.72))
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                        .stroke(Color.white.opacity(0.75), lineWidth: 1)
+                                )
+
+                                if !selectedVenue.isEmpty {
+                                    StatusBadge(label: selectedVenue, tint: AppTheme.primary)
+                                }
+
+                                if isLoadingVenueDetails {
+                                    HStack(spacing: 10) {
+                                        ProgressView()
+                                            .controlSize(.small)
+
+                                        Text("Loading current queue length...")
+                                            .font(.subheadline)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                } else if let venueQueueLength {
+                                    InfoTile(
+                                        title: "Current queue",
+                                        value: "\(venueQueueLength) guests waiting",
+                                        systemImage: "person.2.wave.2"
+                                    )
+                                } else if let venueDetailsError {
+                                    BannerView(
+                                        title: "Queue length unavailable",
+                                        message: venueDetailsError,
+                                        systemImage: "exclamationmark.triangle.fill",
+                                        tint: .orange
+                                    )
+                                }
+                            }
+                        }
+
+                        AppCard {
+                            VStack(alignment: .leading, spacing: 14) {
+                                SectionLabel(title: "Guest details", subtitle: "These come from your saved profile.")
+
+                                ReadOnlyField(title: "Name", value: name, systemImage: "person")
+                                ReadOnlyField(title: "Email", value: email, systemImage: "envelope")
+                                ReadOnlyField(title: "Phone Number", value: phoneNumber, systemImage: "phone")
+                            }
+                        }
+
+                        AppCard {
+                            VStack(alignment: .leading, spacing: 18) {
+                                SectionLabel(title: "Waitlist details", subtitle: "Add a few details to help the host team.")
+
+                                VStack(alignment: .leading, spacing: 10) {
+                                    HStack {
+                                        Text("Party Size")
+                                            .font(.headline)
+
+                                        Spacer()
+
+                                        StatusBadge(label: "\(partySize) guests", tint: AppTheme.secondary)
+                                    }
+
+                                    Stepper("Party Size", value: $partySize, in: 1...99)
+                                        .labelsHidden()
+                                }
+                                .padding(16)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                        .fill(Color.white.opacity(0.72))
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                        .stroke(Color.white.opacity(0.75), lineWidth: 1)
+                                )
+
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Note")
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(.secondary)
+
+                                    TextField("Anything the venue should know?", text: $note, axis: .vertical)
+                                        .lineLimit(3, reservesSpace: true)
+                                        .appInputStyle()
+                                }
                             }
                         }
                     }
-                    .disabled(visitsService.isLoading || visitsService.servedVenueNames.isEmpty)
-                }
-
-                Section("Guest Details") {
-                    TextField("Name", text: .constant(name))
-                        .disabled(true)
-
-                    TextField("Email", text: .constant(email))
-                        .disabled(true)
-
-                    TextField("Phone Number", text: .constant(phoneNumber))
-                        .disabled(true)
-                }
-
-                Section("Waitlist Details") {
-                    Stepper(value: $partySize, in: 1...99) {
-                        HStack {
-                            Text("Party Size")
-                            Spacer()
-                            Text("\(partySize)")
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-
-                    TextField("Note", text: $note, axis: .vertical)
-                        .lineLimit(3, reservesSpace: true)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 24)
                 }
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                Button("Join Waitlist") {
+                VStack(spacing: 10) {
+                    if selectedVenue.isEmpty {
+                        Text("Choose a venue to continue.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Button("Join Waitlist") {
+                    }
+                    .buttonStyle(PrimaryActionButtonStyle())
+                    .disabled(selectedVenue.isEmpty)
                 }
-                .buttonStyle(.borderedProminent)
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 20)
                 .padding(.top, 8)
                 .padding(.bottom, 12)
-                .background(Color(.systemBackground))
-                .disabled(selectedVenue.isEmpty)
+                .background(.ultraThinMaterial)
             }
+            .navigationTitle("Join Waitlist")
+            .navigationBarTitleDisplayMode(.inline)
+            .tint(AppTheme.primary)
             .onChange(of: visitsService.servedVenueNames) { venues in
                 if !venues.contains(selectedVenue) {
                     selectedVenue = ""
                 }
             }
+            .task(id: selectedVenue) {
+                await loadSelectedVenueDetails()
+            }
+        }
+    }
+
+    @MainActor
+    private func loadSelectedVenueDetails() async {
+        venueQueueLength = nil
+        venueDetailsError = nil
+
+        guard !selectedVenue.isEmpty else { return }
+        guard let businessShortCode = selectedVenueBusinessShortCode, !businessShortCode.isEmpty else {
+            venueDetailsError = "This venue is missing its business code."
+            return
+        }
+
+        isLoadingVenueDetails = true
+        defer { isLoadingVenueDetails = false }
+
+        do {
+            let companyData = try await SupabaseFunctionsClient.shared.fetchCompanyData(shortCode: businessShortCode)
+            guard selectedVenueBusinessShortCode == businessShortCode else { return }
+            venueQueueLength = companyData.queueLength
+
+            if companyData.queueLength == nil {
+                venueDetailsError = "The venue did not return a queue length."
+            }
+        } catch {
+            guard selectedVenueBusinessShortCode == businessShortCode else { return }
+            venueDetailsError = error.localizedDescription
         }
     }
 }
@@ -339,30 +584,365 @@ private struct ProfileView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Account") {
-                    TextField("Email", text: .constant(authService.authenticatedEmail ?? ""))
-                        .disabled(true)
+            ZStack {
+                AppBackground()
 
-                    Text("Your email is verified on this device, so the app opens directly until you sign out or the session expires.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 20) {
+                        ScreenHeader(
+                            eyebrow: "PROFILE",
+                            title: "Guest details",
+                            message: "Keep your contact information ready so future waitlist check-ins are quick and accurate.",
+                            systemImage: "person.crop.circle.badge.checkmark"
+                        )
 
-                    Button("Sign Out", role: .destructive) {
-                        Task {
-                            await authService.signOut()
+                        AppCard {
+                            VStack(alignment: .leading, spacing: 14) {
+                                SectionLabel(title: "Account", subtitle: "Your email stays verified on this device until you sign out or the session expires.")
+
+                                ReadOnlyField(
+                                    title: "Verified Email",
+                                    value: authService.authenticatedEmail ?? "",
+                                    systemImage: "checkmark.seal"
+                                )
+
+                                Button("Sign Out", role: .destructive) {
+                                    Task {
+                                        await authService.signOut()
+                                    }
+                                }
+                                .buttonStyle(SecondaryActionButtonStyle(tint: .red))
+                            }
+                        }
+
+                        AppCard {
+                            VStack(alignment: .leading, spacing: 14) {
+                                SectionLabel(title: "Personal info", subtitle: "This information is reused when you join the waitlist.")
+
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Name")
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(.secondary)
+
+                                    TextField("Your name", text: $name)
+                                        .textContentType(.name)
+                                        .appInputStyle()
+                                }
+
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Phone Number")
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(.secondary)
+
+                                    TextField("Your phone number", text: $phoneNumber)
+                                        .textContentType(.telephoneNumber)
+                                        .keyboardType(.phonePad)
+                                        .appInputStyle()
+                                }
+                            }
                         }
                     }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 24)
                 }
-
-                TextField("Name", text: $name)
-                    .textContentType(.name)
-
-                TextField("Phone Number", text: $phoneNumber)
-                    .textContentType(.telephoneNumber)
-                    .keyboardType(.phonePad)
             }
             .navigationTitle("Profile")
+            .navigationBarTitleDisplayMode(.inline)
+            .tint(AppTheme.primary)
         }
+    }
+}
+
+private enum AppTheme {
+    static let primary = Color(red: 0.45, green: 0.34, blue: 0.96)
+    static let secondary = Color(red: 0.11, green: 0.69, blue: 0.84)
+    static let backgroundTop = Color(red: 0.97, green: 0.95, blue: 1.00)
+    static let backgroundBottom = Color(red: 0.92, green: 0.97, blue: 1.00)
+}
+
+private struct AppBackground: View {
+    var body: some View {
+        LinearGradient(
+            colors: [AppTheme.backgroundTop, AppTheme.backgroundBottom],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        .ignoresSafeArea()
+    }
+}
+
+private struct ScreenHeader: View {
+    let eyebrow: String
+    let title: String
+    let message: String
+    var systemImage: String? = nil
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            if let systemImage {
+                Image(systemName: systemImage)
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundStyle(AppTheme.primary)
+                    .frame(width: 56, height: 56)
+                    .background(
+                        Circle()
+                            .fill(.white.opacity(0.75))
+                    )
+            }
+
+            Text(eyebrow)
+                .font(.caption.weight(.semibold))
+                .tracking(1.2)
+                .foregroundStyle(.secondary)
+
+            Text(title)
+                .font(.system(size: 30, weight: .bold, design: .rounded))
+                .foregroundStyle(.primary)
+
+            Text(message)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct AppCard<Content: View>: View {
+    private let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            content
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .fill(.white.opacity(0.72))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .stroke(.white.opacity(0.8), lineWidth: 1)
+        )
+        .shadow(color: AppTheme.primary.opacity(0.10), radius: 24, y: 14)
+    }
+}
+
+private struct SectionLabel: View {
+    let title: String
+    let subtitle: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.headline)
+
+            Text(subtitle)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
+private struct BannerView: View {
+    let title: String
+    let message: String
+    let systemImage: String
+    var tint: Color = AppTheme.primary
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: systemImage)
+                .foregroundStyle(tint)
+                .frame(width: 20)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+
+                Text(message)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(tint.opacity(0.10))
+        )
+    }
+}
+
+private struct StatPill: View {
+    let title: String
+    let value: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title.uppercased())
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            Text(value)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.white.opacity(0.78))
+        )
+    }
+}
+
+private struct StatusBadge: View {
+    let label: String
+    let tint: Color
+
+    var body: some View {
+        Text(label)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(tint)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(tint.opacity(0.12))
+            )
+    }
+}
+
+private struct InfoTile: View {
+    let title: String
+    let value: String
+    let systemImage: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(title, systemImage: systemImage)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            Text(value)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.white.opacity(0.78))
+        )
+    }
+}
+
+private struct ReadOnlyField: View {
+    let title: String
+    let value: String
+    let systemImage: String
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: systemImage)
+                .foregroundStyle(AppTheme.primary)
+                .frame(width: 18)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                Text(value.isEmpty ? "Not set" : value)
+                    .font(.subheadline)
+                    .foregroundStyle(value.isEmpty ? .secondary : .primary)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.white.opacity(0.72))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.white.opacity(0.75), lineWidth: 1)
+        )
+    }
+}
+
+private struct PrimaryActionButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.headline)
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [AppTheme.primary, AppTheme.secondary],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+            )
+            .scaleEffect(configuration.isPressed ? 0.985 : 1)
+            .opacity(configuration.isPressed ? 0.92 : 1)
+            .shadow(color: AppTheme.primary.opacity(0.22), radius: 16, y: 8)
+    }
+}
+
+private struct SecondaryActionButtonStyle: ButtonStyle {
+    var tint: Color = AppTheme.primary
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.headline)
+            .foregroundStyle(tint)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(.white.opacity(0.78))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(tint.opacity(0.18), lineWidth: 1)
+            )
+            .scaleEffect(configuration.isPressed ? 0.985 : 1)
+            .opacity(configuration.isPressed ? 0.92 : 1)
+    }
+}
+
+private struct AppInputStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(Color.white.opacity(0.72))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(Color.white.opacity(0.75), lineWidth: 1)
+            )
+    }
+}
+
+private extension View {
+    func appInputStyle() -> some View {
+        modifier(AppInputStyle())
     }
 }

@@ -39,6 +39,17 @@ final class GuestVisitsService: ObservableObject {
         .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
     }
 
+    func venueBusinessShortCode(for venueName: String) -> String? {
+        let normalizedVenueName = venueName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedVenueName.isEmpty else { return nil }
+
+        return visits.first {
+            $0.status.caseInsensitiveCompare("served") == .orderedSame
+                && $0.companyName.trimmingCharacters(in: .whitespacesAndNewlines)
+                    .caseInsensitiveCompare(normalizedVenueName) == .orderedSame
+        }?.businessShortCode?.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     // MARK: - Lifecycle
 
     func start() {

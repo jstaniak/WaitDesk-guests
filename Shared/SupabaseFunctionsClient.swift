@@ -17,10 +17,12 @@ struct PartyData: Decodable {
 struct CompanyData: Decodable {
     let name: String
     let logoData: String?
+    let queueLength: Int?
 }
 
 struct GuestVisitData: Decodable, Identifiable {
     let companyName: String
+    let businessShortCode: String?
     let date: String
     let status: String
     let actualWaitTime: Int?
@@ -32,6 +34,7 @@ struct GuestVisitData: Decodable, Identifiable {
 
     private enum CodingKeys: String, CodingKey {
         case companyName
+        case businessShortCode
         case date
         case status
         case actualWaitTime
@@ -41,6 +44,7 @@ struct GuestVisitData: Decodable, Identifiable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         companyName = try container.decode(String.self, forKey: .companyName)
+        businessShortCode = try container.decodeIfPresent(String.self, forKey: .businessShortCode)
         date = try container.decode(String.self, forKey: .date)
         status = try container.decode(String.self, forKey: .status)
         shortCode = try container.decodeIfPresent(String.self, forKey: .shortCode)
