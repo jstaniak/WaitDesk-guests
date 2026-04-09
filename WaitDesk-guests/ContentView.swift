@@ -70,7 +70,14 @@ struct ContentView: View {
                 message: error.message
             )
         } else {
-            StatusView(partyShortCode: visitsService.currentVisitShortCode)
+            StatusView(
+                partyShortCode: visitsService.currentVisitShortCode,
+                onStatusChanged: { _, _ in
+                    Task {
+                        await visitsService.refresh()
+                    }
+                }
+            )
         }
     }
 

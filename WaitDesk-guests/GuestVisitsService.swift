@@ -1,6 +1,5 @@
 import Combine
 import Foundation
-import Supabase
 
 @MainActor
 final class GuestVisitsService: ObservableObject {
@@ -79,45 +78,9 @@ final class GuestVisitsService: ObservableObject {
 
     private func runLifecycle() async {
         await fetchVisits()
+
         guard !Task.isCancelled else { return }
-
-        do {
-            try Task.checkCancellation()
-            await supabase.realtimeV2.connect()
-
-            let channel = supabase.realtimeV2.channel("visits:\(email)")
-            let stream = await channel.broadcastStream(event: "*")
-
-            defer {
-                Task { await channel.unsubscribe() }
-            }
-
-            try await channel.subscribeWithError()
-
-            await withTaskGroup(of: Void.self) { group in
-                group.addTask { @MainActor [weak self] in
-                    for await _ in stream {
-                        guard !Task.isCancelled else { return }
-                        await self?.fetchVisits()
-                    }
-                }
-
-                group.addTask { @MainActor [weak self] in
-                    while !Task.isCancelled {
-                        do {
-                            try await Task.sleep(nanoseconds: Self.pollingInterval)
-                        } catch {
-                            return
-                        }
-                        await self?.fetchVisits()
-                    }
-                }
-            }
-        } catch is CancellationError {
-            return
-        } catch {
-            await pollOnly()
-        }
+        await pollOnly()
     }
 
     private func pollOnly() async {

@@ -193,6 +193,15 @@ private final class ConnectivityObserver: ObservableObject {
 
 struct StatusView: View {
     let partyShortCode: String?
+    let onStatusChanged: ((String, String) -> Void)?
+
+    init(
+        partyShortCode: String?,
+        onStatusChanged: ((String, String) -> Void)? = nil
+    ) {
+        self.partyShortCode = partyShortCode
+        self.onStatusChanged = onStatusChanged
+    }
 
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var connectivityObserver = ConnectivityObserver()
@@ -657,6 +666,7 @@ struct StatusView: View {
 
     @MainActor
     private func apply(_ snapshot: StatusSnapshot) {
+        let previousStatus = status
         loadError = nil
         partyName = snapshot.party.name
         companyName = snapshot.company.name
@@ -671,6 +681,8 @@ struct StatusView: View {
                 position = nil
             }
         }
+
+        refreshVisitsIfStatusChanged(from: previousStatus, to: snapshot.party.status)
     }
 
     @MainActor
@@ -685,6 +697,12 @@ struct StatusView: View {
         withAnimation {
             position = nil
         }
+    }
+
+    @MainActor
+    private func refreshVisitsIfStatusChanged(from previousStatus: String, to newStatus: String) {
+        guard !previousStatus.isEmpty, previousStatus != newStatus else { return }
+        onStatusChanged?(previousStatus, newStatus)
     }
 
     private func fetchPartyData() async throws -> PartyData {
@@ -756,12 +774,15 @@ struct StatusView: View {
 
         do {
             try await SupabaseFunctionsClient.shared.cancelQueue(shortCode: shortCode)
+            let previousStatus = status
 
             withAnimation {
                 status = "cancelled"
                 notifiedAt = nil
                 position = nil
             }
+
+            refreshVisitsIfStatusChanged(from: previousStatus, to: status)
         } catch {
             cancelErrorMessage = error.localizedDescription
         }
