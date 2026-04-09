@@ -63,6 +63,76 @@ struct GuestVisitData: Decodable, Identifiable {
     }
 }
 
+struct SelfCheckInInput: Encodable {
+    let businessShortCode: String
+    let name: String
+    let email: String
+    let partySize: Int
+    let phoneNumber: String?
+    let note: String?
+}
+
+struct SelfCheckInData: Decodable {
+    let id: String
+    let shortCode: String
+    let name: String
+    let email: String
+    let partySize: Int
+    let phoneNumber: String?
+    let note: String?
+    let status: String
+    let estimatedWaitTime: Int?
+    let createdAt: String
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case shortCode
+        case name
+        case email
+        case partySize
+        case phoneNumber
+        case note
+        case status
+        case estimatedWaitTime
+        case createdAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        shortCode = try container.decode(String.self, forKey: .shortCode)
+        name = try container.decode(String.self, forKey: .name)
+        email = try container.decode(String.self, forKey: .email)
+        partySize = try container.decode(Int.self, forKey: .partySize)
+        phoneNumber = try container.decodeIfPresent(String.self, forKey: .phoneNumber)
+        note = try container.decodeIfPresent(String.self, forKey: .note)
+        status = try container.decode(String.self, forKey: .status)
+        createdAt = try container.decode(String.self, forKey: .createdAt)
+
+        if let stringID = try? container.decode(String.self, forKey: .id) {
+            id = stringID
+        } else if let intID = try? container.decode(Int.self, forKey: .id) {
+            id = String(intID)
+        } else {
+            throw DecodingError.typeMismatch(
+                String.self,
+                .init(codingPath: container.codingPath + [CodingKeys.id], debugDescription: "Expected string or integer id")
+            )
+        }
+
+        if let intWait = try? container.decodeIfPresent(Int.self, forKey: .estimatedWaitTime) {
+            estimatedWaitTime = intWait
+        } else if let doubleWait = try? container.decodeIfPresent(Double.self, forKey: .estimatedWaitTime) {
+            estimatedWaitTime = Int(doubleWait.rounded())
+        } else if let stringWait = try? container.decodeIfPresent(String.self, forKey: .estimatedWaitTime),
+                  let parsedWait = Int(stringWait)
+        {
+            estimatedWaitTime = parsedWait
+        } else {
+            estimatedWaitTime = nil
+        }
+    }
+}
+
 final class SupabaseFunctionsClient {
     static let shared = SupabaseFunctionsClient()
 
@@ -117,6 +187,28 @@ final class SupabaseFunctionsClient {
         return response.data
     }
 
+    func selfCheckIn(input: SelfCheckInInput) async throws -> SelfCheckInData {
+        let session: Session
+
+        do {
+            session = try await supabase.auth.session
+        } catch {
+            throw EdgeFunctionError.unauthorized
+        }
+
+        let response: SelfCheckInResponse = try await supabase.functions.invoke(
+            "self-checkin",
+            options: .init(
+                headers: [
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer \(session.accessToken)"
+                ],
+                body: input
+            )
+        )
+        return response.data
+    }
+
     func registerDeviceToken(_ fcmToken: String) async throws {
         try await supabase.functions.invoke(
             "register-device-token",
@@ -160,4 +252,9 @@ private struct GuestVisitsResponse: Decodable {
 private struct PositionResponse: Decodable {
     let success: Bool
     let position: Int?
+}
+
+private struct SelfCheckInResponse: Decodable {
+    let success: Bool
+    let data: SelfCheckInData
 }

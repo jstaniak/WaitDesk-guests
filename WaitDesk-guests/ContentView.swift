@@ -1,4 +1,5 @@
 import Foundation
+import Supabase
 import SwiftUI
 
 struct ContentView: View {
@@ -257,18 +258,22 @@ private struct VisitsView: View {
                                     }
                                 }
 
-                                LazyVStack(spacing: 14) {
+                                LazyVStack(spacing: 10) {
                                     ForEach(visitsService.nonWaitingVisits) { visit in
                                         AppCard {
-                                            VStack(alignment: .leading, spacing: 14) {
+                                            VStack(alignment: .leading, spacing: 8) {
                                                 HStack(alignment: .top, spacing: 12) {
-                                                    VStack(alignment: .leading, spacing: 6) {
+                                                    VStack(alignment: .leading, spacing: 4) {
                                                         Text(visit.companyName)
                                                             .font(.headline)
 
-                                                        Text(formattedDate(visit.date))
-                                                            .font(.subheadline)
-                                                            .foregroundStyle(.secondary)
+                                                        HStack(spacing: 6) {
+                                                            Text(formattedDate(visit.date))
+                                                            Text("·")
+                                                            Label(formattedWaitTime(visit.actualWaitTime), systemImage: "clock")
+                                                        }
+                                                        .font(.subheadline)
+                                                        .foregroundStyle(.secondary)
                                                     }
 
                                                     Spacer(minLength: 0)
@@ -276,20 +281,6 @@ private struct VisitsView: View {
                                                     StatusBadge(
                                                         label: formattedStatus(visit.status),
                                                         tint: statusTint(for: visit.status)
-                                                    )
-                                                }
-
-                                                HStack(spacing: 12) {
-                                                    InfoTile(
-                                                        title: "Wait time",
-                                                        value: formattedWaitTime(visit.actualWaitTime),
-                                                        systemImage: "clock"
-                                                    )
-
-                                                    InfoTile(
-                                                        title: "Visit code",
-                                                        value: visit.shortCode ?? "Not available",
-                                                        systemImage: "number.circle"
                                                     )
                                                 }
                                             }
@@ -376,16 +367,74 @@ private struct JoinWaitlistView: View {
     @AppStorage("profile.name") private var name = ""
     @AppStorage("profile.email") private var email = ""
     @AppStorage("profile.phoneNumber") private var phoneNumber = ""
+    @ObservedObject private var authService = GuestAuthService.shared
     @ObservedObject private var visitsService = GuestVisitsService.shared
     @State private var partySize = 1
     @State private var note = ""
     @State private var selectedVenue = ""
     @State private var venueQueueLength: Int?
     @State private var isLoadingVenueDetails = false
+    @State private var isSubmittingWaitlist = false
+    @State private var joinWaitlistErrorMessage: String?
+    @State private var joinWaitlistSuccessMessage: String?
     @State private var venueDetailsError: String?
 
     private var selectedVenueBusinessShortCode: String? {
         visitsService.venueBusinessShortCode(for: selectedVenue)
+    }
+
+    private var trimmedName: String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var requestEmail: String {
+        let value = authService.authenticatedEmail ?? email
+        return value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    private var trimmedPhoneNumber: String? {
+        let value = phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
+    }
+
+    private var trimmedNote: String? {
+        let value = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
+    }
+
+    private var canSubmitJoinWaitlist: Bool {
+        joinWaitlistValidationMessage == nil && !isSubmittingWaitlist
+    }
+
+    private var joinWaitlistValidationMessage: String? {
+        if selectedVenue.isEmpty {
+            return "Choose a venue to continue."
+        }
+
+        if selectedVenueBusinessShortCode?.isEmpty != false {
+            return "This venue is missing its business code."
+        }
+
+        if trimmedName.isEmpty {
+            return "Add your name in the Profile tab to continue."
+        }
+
+        if requestEmail.isEmpty {
+            return "Your verified email is unavailable. Sign in again to continue."
+        }
+
+        return nil
+    }
+
+    private var joinWaitlistSuccessAlertBinding: Binding<Bool> {
+        Binding(
+            get: { joinWaitlistSuccessMessage != nil },
+            set: { isPresented in
+                if !isPresented {
+                    joinWaitlistSuccessMessage = nil
+                }
+            }
+        )
     }
 
     var body: some View {
@@ -468,8 +517,17 @@ private struct JoinWaitlistView: View {
                                 SectionLabel(title: "Guest details", subtitle: "These come from your saved profile.")
 
                                 ReadOnlyField(title: "Name", value: name, systemImage: "person")
-                                ReadOnlyField(title: "Email", value: email, systemImage: "envelope")
+                                ReadOnlyField(title: "Email", value: requestEmail, systemImage: "envelope")
                                 ReadOnlyField(title: "Phone Number", value: phoneNumber, systemImage: "phone")
+
+                                if trimmedName.isEmpty {
+                                    BannerView(
+                                        title: "Name required",
+                                        message: "Add your name in the Profile tab before joining the waitlist.",
+                                        systemImage: "person.crop.circle.badge.exclamationmark",
+                                        tint: .orange
+                                    )
+                                }
                             }
                         }
 
@@ -509,6 +567,15 @@ private struct JoinWaitlistView: View {
                                         .lineLimit(3, reservesSpace: true)
                                         .appInputStyle()
                                 }
+
+                                if let joinWaitlistErrorMessage {
+                                    BannerView(
+                                        title: "Unable to join waitlist",
+                                        message: joinWaitlistErrorMessage,
+                                        systemImage: "exclamationmark.triangle.fill",
+                                        tint: .red
+                                    )
+                                }
                             }
                         }
                     }
@@ -518,21 +585,38 @@ private struct JoinWaitlistView: View {
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 VStack(spacing: 10) {
-                    if selectedVenue.isEmpty {
-                        Text("Choose a venue to continue.")
+                    if let joinWaitlistValidationMessage {
+                        Text(joinWaitlistValidationMessage)
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
 
-                    Button("Join Waitlist") {
+                    Button {
+                        Task {
+                            await joinWaitlist()
+                        }
+                    } label: {
+                        HStack(spacing: 10) {
+                            if isSubmittingWaitlist {
+                                ProgressView()
+                                    .tint(.white)
+                            }
+
+                            Text(isSubmittingWaitlist ? "Joining..." : "Join Waitlist")
+                        }
                     }
                     .buttonStyle(PrimaryActionButtonStyle())
-                    .disabled(selectedVenue.isEmpty)
+                    .disabled(!canSubmitJoinWaitlist)
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
                 .padding(.bottom, 12)
                 .background(.ultraThinMaterial)
+            }
+            .alert("You're on the waitlist", isPresented: joinWaitlistSuccessAlertBinding) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(joinWaitlistSuccessMessage ?? "")
             }
             .navigationTitle("Join Waitlist")
             .navigationBarTitleDisplayMode(.inline)
@@ -545,6 +629,54 @@ private struct JoinWaitlistView: View {
             .task(id: selectedVenue) {
                 await loadSelectedVenueDetails()
             }
+        }
+    }
+
+    @MainActor
+    private func joinWaitlist() async {
+        joinWaitlistErrorMessage = nil
+
+        guard let businessShortCode = selectedVenueBusinessShortCode?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !businessShortCode.isEmpty
+        else {
+            joinWaitlistErrorMessage = "This venue is missing its business code."
+            return
+        }
+
+        guard !trimmedName.isEmpty else {
+            joinWaitlistErrorMessage = "Add your name in the Profile tab before joining the waitlist."
+            return
+        }
+
+        guard !requestEmail.isEmpty else {
+            joinWaitlistErrorMessage = "Your verified email is unavailable. Sign in again to continue."
+            return
+        }
+
+        isSubmittingWaitlist = true
+        defer { isSubmittingWaitlist = false }
+
+        do {
+            let result = try await SupabaseFunctionsClient.shared.selfCheckIn(
+                input: SelfCheckInInput(
+                    businessShortCode: businessShortCode,
+                    name: trimmedName,
+                    email: requestEmail,
+                    partySize: partySize,
+                    phoneNumber: trimmedPhoneNumber,
+                    note: trimmedNote
+                )
+            )
+
+            note = ""
+            partySize = 1
+            joinWaitlistSuccessMessage = formattedJoinWaitlistSuccessMessage(for: result)
+            await visitsService.refresh()
+        } catch is CancellationError {
+            return
+        } catch {
+            guard !Task.isCancelled else { return }
+            joinWaitlistErrorMessage = await messageForJoinWaitlistError(error)
         }
     }
 
@@ -574,6 +706,47 @@ private struct JoinWaitlistView: View {
             guard selectedVenueBusinessShortCode == businessShortCode else { return }
             venueDetailsError = error.localizedDescription
         }
+    }
+
+    @MainActor
+    private func messageForJoinWaitlistError(_ error: Error) async -> String {
+        if String(describing: error).contains("sessionMissing") {
+            await authService.handleExpiredOrInvalidSession()
+            return "Your session expired. Verify your email again to continue."
+        }
+
+        guard let functionsError = error as? FunctionsError else {
+            return error.localizedDescription
+        }
+
+        switch functionsError {
+        case let .httpError(code, _):
+            switch code {
+            case 400:
+                return "Please review your details and try again."
+            case 401:
+                await authService.handleExpiredOrInvalidSession()
+                return "Your session expired. Verify your email again to continue."
+            case 403:
+                return "This venue is not accepting self check-ins right now."
+            case 429:
+                return "Too many requests. Please wait a moment and try again."
+            case 500, 503:
+                return "The waitlist service is temporarily unavailable. Please try again soon."
+            default:
+                return "Server error (\(code))"
+            }
+        case .relayError:
+            return "Unable to reach the server"
+        }
+    }
+
+    private func formattedJoinWaitlistSuccessMessage(for result: SelfCheckInData) -> String {
+        if let estimatedWaitTime = result.estimatedWaitTime {
+            return "You joined \(selectedVenue) with code \(result.shortCode). Estimated wait: \(estimatedWaitTime) min."
+        }
+
+        return "You joined \(selectedVenue) with code \(result.shortCode)."
     }
 }
 
