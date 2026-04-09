@@ -267,13 +267,17 @@ private struct VisitsView: View {
                                                         Text(visit.companyName)
                                                             .font(.headline)
 
-                                                        HStack(spacing: 6) {
-                                                            Text(formattedDate(visit.date))
-                                                            Text("·")
-                                                            Label(formattedWaitTime(visit.actualWaitTime), systemImage: "clock")
+                                                        Text(formattedDate(visit.date))
+                                                            .font(.subheadline)
+                                                            .foregroundStyle(.secondary)
+
+                                                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                                            Text("WAIT TIME")
+                                                                .font(.caption2.weight(.semibold))
+                                                                .foregroundStyle(.secondary)
+                                                            Text(formattedWaitTime(visit.actualWaitTime))
+                                                                .font(.subheadline.weight(.semibold))
                                                         }
-                                                        .font(.subheadline)
-                                                        .foregroundStyle(.secondary)
                                                     }
 
                                                     Spacer(minLength: 0)
