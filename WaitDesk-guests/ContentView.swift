@@ -1,6 +1,7 @@
 import Foundation
 import Supabase
 import SwiftUI
+import UIKit
 
 struct ContentView: View {
     private enum Tab: Hashable {
@@ -72,6 +73,8 @@ struct ContentView: View {
                 .tag(Tab.profile)
         }
         .tint(AppTheme.primary)
+        .toolbarBackground(.visible, for: .tabBar)
+        .toolbarBackground(Color(.systemBackground), for: .tabBar)
     }
 
     @ViewBuilder
@@ -479,11 +482,11 @@ private struct JoinWaitlistView: View {
                                 .padding(.vertical, 14)
                                 .background(
                                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                        .fill(Color.white.opacity(0.72))
+                                        .fill(AppTheme.fieldBackground)
                                 )
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                        .stroke(Color.white.opacity(0.75), lineWidth: 1)
+                                        .stroke(AppTheme.border.opacity(0.18), lineWidth: 1)
                                 )
 
                                 if !selectedVenue.isEmpty {
@@ -555,11 +558,11 @@ private struct JoinWaitlistView: View {
                                 .padding(16)
                                 .background(
                                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                        .fill(Color.white.opacity(0.72))
+                                        .fill(AppTheme.fieldBackground)
                                 )
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                        .stroke(Color.white.opacity(0.75), lineWidth: 1)
+                                        .stroke(AppTheme.border.opacity(0.18), lineWidth: 1)
                                 )
 
                                 VStack(alignment: .leading, spacing: 8) {
@@ -833,8 +836,27 @@ private struct ProfileView: View {
 private enum AppTheme {
     static let primary = Color(red: 0.45, green: 0.34, blue: 0.96)
     static let secondary = Color(red: 0.11, green: 0.69, blue: 0.84)
-    static let backgroundTop = Color(red: 0.97, green: 0.95, blue: 1.00)
-    static let backgroundBottom = Color(red: 0.92, green: 0.97, blue: 1.00)
+    static let backgroundTop = Color(
+        uiColor: UIColor { traitCollection in
+            if traitCollection.userInterfaceStyle == .dark {
+                return UIColor(red: 0.09, green: 0.08, blue: 0.15, alpha: 1)
+            }
+
+            return UIColor(red: 0.97, green: 0.95, blue: 1.00, alpha: 1)
+        }
+    )
+    static let backgroundBottom = Color(
+        uiColor: UIColor { traitCollection in
+            if traitCollection.userInterfaceStyle == .dark {
+                return UIColor(red: 0.06, green: 0.12, blue: 0.18, alpha: 1)
+            }
+
+            return UIColor(red: 0.92, green: 0.97, blue: 1.00, alpha: 1)
+        }
+    )
+    static let cardBackground = Color(uiColor: .secondarySystemBackground)
+    static let fieldBackground = Color(uiColor: .tertiarySystemBackground)
+    static let border = Color(uiColor: .separator)
 }
 
 private struct AppBackground: View {
@@ -863,7 +885,7 @@ private struct ScreenHeader: View {
                     .frame(width: 56, height: 56)
                     .background(
                         Circle()
-                            .fill(.white.opacity(0.75))
+                            .fill(AppTheme.cardBackground)
                     )
             }
 
@@ -899,11 +921,11 @@ private struct AppCard<Content: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .fill(.white.opacity(0.72))
+                .fill(AppTheme.cardBackground)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .stroke(.white.opacity(0.8), lineWidth: 1)
+                .stroke(AppTheme.border.opacity(0.18), lineWidth: 1)
         )
         .shadow(color: AppTheme.primary.opacity(0.10), radius: 24, y: 14)
     }
@@ -975,7 +997,7 @@ private struct StatPill: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color.white.opacity(0.78))
+                .fill(AppTheme.fieldBackground)
         )
     }
 }
@@ -1017,7 +1039,7 @@ private struct InfoTile: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color.white.opacity(0.78))
+                .fill(AppTheme.fieldBackground)
         )
     }
 }
@@ -1048,11 +1070,11 @@ private struct ReadOnlyField: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color.white.opacity(0.72))
+                .fill(AppTheme.fieldBackground)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(Color.white.opacity(0.75), lineWidth: 1)
+                .stroke(AppTheme.border.opacity(0.18), lineWidth: 1)
         )
     }
 }
@@ -1091,11 +1113,11 @@ private struct SecondaryActionButtonStyle: ButtonStyle {
             .padding(.vertical, 16)
             .background(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(.white.opacity(0.78))
+                    .fill(AppTheme.fieldBackground)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .stroke(tint.opacity(0.18), lineWidth: 1)
+                    .stroke(AppTheme.border.opacity(0.18), lineWidth: 1)
             )
             .scaleEffect(configuration.isPressed ? 0.985 : 1)
             .opacity(configuration.isPressed ? 0.92 : 1)
@@ -1109,11 +1131,11 @@ private struct AppInputStyle: ViewModifier {
             .padding(.vertical, 14)
             .background(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(Color.white.opacity(0.72))
+                    .fill(AppTheme.fieldBackground)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(Color.white.opacity(0.75), lineWidth: 1)
+                    .stroke(AppTheme.border.opacity(0.18), lineWidth: 1)
             )
     }
 }
