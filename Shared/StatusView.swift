@@ -83,7 +83,7 @@ private enum GuestStatus: Equatable {
     var title: String {
         switch self {
         case .waiting:
-            return "You're next!"
+            return "Waiting for your turn"
         case .notified:
             return "Your spot is ready!"
         case .served:
@@ -227,6 +227,14 @@ struct StatusView: View {
         GuestStatus(status: status, notifiedAt: notifiedAt)
     }
 
+    private var statusTitle: String {
+        if guestStatus == .waiting, position == 1 {
+            return "You're next!"
+        }
+
+        return guestStatus.title
+    }
+
     private var trimmedPartyShortCode: String? {
         guard let partyShortCode else { return nil }
         let trimmed = partyShortCode.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -272,7 +280,7 @@ struct StatusView: View {
                                     statusCircle(size: metrics.circleSize)
 
                                     VStack(spacing: 8) {
-                                        Text(guestStatus.title)
+                                        Text(statusTitle)
                                             .font(.system(size: 24, weight: .bold))
                                             .multilineTextAlignment(.center)
 
