@@ -159,7 +159,7 @@ private struct GuestVerificationView: View {
                                             .font(.subheadline.weight(.semibold))
                                             .foregroundStyle(.secondary)
 
-                                        TextField("6-digit code", text: $authService.otpCode)
+                                        TextField("Code from your email", text: $authService.otpCode)
                                             .textContentType(.oneTimeCode)
                                             .keyboardType(.numberPad)
                                             .appInputStyle()
@@ -176,14 +176,6 @@ private struct GuestVerificationView: View {
                                 }
 
                                 VStack(spacing: 12) {
-                                    Button(authService.isCodeSent ? "Resend Code" : "Send Code") {
-                                        Task {
-                                            await authService.sendOTP()
-                                        }
-                                    }
-                                    .buttonStyle(PrimaryActionButtonStyle())
-                                    .disabled(authService.isSendingCode || authService.isVerifyingCode)
-
                                     if authService.isCodeSent {
                                         Button("Verify Code") {
                                             Task {
@@ -191,6 +183,22 @@ private struct GuestVerificationView: View {
                                             }
                                         }
                                         .buttonStyle(SecondaryActionButtonStyle())
+                                        .disabled(authService.isSendingCode || authService.isVerifyingCode)
+
+                                        Button("Resend Code") {
+                                            Task {
+                                                await authService.sendOTP()
+                                            }
+                                        }
+                                        .buttonStyle(PrimaryActionButtonStyle())
+                                        .disabled(authService.isSendingCode || authService.isVerifyingCode)
+                                    } else {
+                                        Button("Send Code") {
+                                            Task {
+                                                await authService.sendOTP()
+                                            }
+                                        }
+                                        .buttonStyle(PrimaryActionButtonStyle())
                                         .disabled(authService.isSendingCode || authService.isVerifyingCode)
                                     }
                                 }
