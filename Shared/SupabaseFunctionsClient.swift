@@ -209,10 +209,16 @@ final class SupabaseFunctionsClient {
         return response.data
     }
 
-    func registerDeviceToken(_ fcmToken: String) async throws {
+    func registerDeviceToken(_ fcmToken: String, shortCode: String, platform: String) async throws {
         try await supabase.functions.invoke(
             "register-device-token",
-            options: .init(body: ["fcmToken": fcmToken])
+            options: .init(
+                body: [
+                    "fcmToken": fcmToken,
+                    "shortCode": shortCode,
+                    "platform": platform
+                ]
+            )
         )
     }
 }

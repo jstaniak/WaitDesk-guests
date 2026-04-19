@@ -9,6 +9,11 @@ struct WaitDesk_clipApp: App {
     var body: some Scene {
         WindowGroup {
             StatusView(partyShortCode: clipPartyShortCode)
+                .task(id: clipPartyShortCode) {
+                    await PushNotificationRegistrationManager.shared.prepareForStatusViewWithoutPrompt(
+                        shortCode: clipPartyShortCode
+                    )
+                }
         }
     }
 }

@@ -39,6 +39,13 @@ struct ContentView: View {
             if newPhase == .active {
                 if authService.isAuthenticated {
                     visitsService.restart()
+                    if selectedTab == .status {
+                        Task {
+                            await PushNotificationRegistrationManager.shared.prepareForStatusView(
+                                shortCode: visitsService.currentVisitShortCode
+                            )
+                        }
+                    }
                 }
             } else if newPhase == .background {
                 visitsService.stop()
@@ -97,6 +104,11 @@ struct ContentView: View {
                     }
                 }
             )
+            .task(id: visitsService.currentVisitShortCode) {
+                await PushNotificationRegistrationManager.shared.prepareForStatusView(
+                    shortCode: visitsService.currentVisitShortCode
+                )
+            }
         }
     }
 }
