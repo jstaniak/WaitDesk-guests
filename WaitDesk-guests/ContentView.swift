@@ -762,10 +762,10 @@ private struct JoinWaitlistView: View {
 
     private func formattedJoinWaitlistSuccessMessage(for result: SelfCheckInData) -> String {
         if let estimatedWaitTime = result.estimatedWaitTime {
-            return "You joined \(selectedVenue) with code \(result.shortCode). Estimated wait: \(estimatedWaitTime) min."
+            return "You joined \(selectedVenue). Estimated wait: \(estimatedWaitTime) min."
         }
 
-        return "You joined \(selectedVenue) with code \(result.shortCode)."
+        return "You joined \(selectedVenue)."
     }
 }
 
