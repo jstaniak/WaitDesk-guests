@@ -396,7 +396,7 @@ private struct JoinWaitlistView: View {
     @AppStorage("profile.phoneNumber") private var phoneNumber = ""
     @ObservedObject private var authService = GuestAuthService.shared
     @ObservedObject private var visitsService = GuestVisitsService.shared
-    @State private var partySize = 1
+    @State private var partySize = 2
     @State private var note = ""
     @State private var selectedVenue = ""
     @State private var venueQueueLength: Int?
@@ -696,7 +696,7 @@ private struct JoinWaitlistView: View {
             )
 
             note = ""
-            partySize = 1
+            partySize = 2
             joinWaitlistSuccessMessage = formattedJoinWaitlistSuccessMessage(for: result)
             await visitsService.refresh()
         } catch is CancellationError {
