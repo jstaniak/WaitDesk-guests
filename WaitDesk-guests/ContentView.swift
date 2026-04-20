@@ -405,6 +405,7 @@ private struct JoinWaitlistView: View {
     @State private var joinWaitlistErrorMessage: String?
     @State private var joinWaitlistSuccessMessage: String?
     @State private var venueDetailsError: String?
+    @State private var selfCheckInAvailability: SelfCheckInAvailabilityData?
 
     private var selectedVenueBusinessShortCode: String? {
         visitsService.venueBusinessShortCode(for: selectedVenue)
@@ -430,7 +431,7 @@ private struct JoinWaitlistView: View {
     }
 
     private var canSubmitJoinWaitlist: Bool {
-        joinWaitlistValidationMessage == nil && !isSubmittingWaitlist
+        joinWaitlistValidationMessage == nil && !isSubmittingWaitlist && !isLoadingVenueDetails && !isSelfCheckInUnavailable
     }
 
     private var joinWaitlistValidationMessage: String? {
@@ -451,6 +452,21 @@ private struct JoinWaitlistView: View {
         }
 
         return nil
+    }
+
+    private var isSelfCheckInUnavailable: Bool {
+        selfCheckInAvailability?.available == false
+    }
+
+    private var selfCheckInUnavailableReason: String {
+        let trimmedReason = selfCheckInAvailability?.reason?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if let trimmedReason, !trimmedReason.isEmpty {
+            return trimmedReason
+        }
+
+        return "Self check-in is closed today"
     }
 
     private var joinWaitlistSuccessAlertBinding: Binding<Bool> {
@@ -518,7 +534,7 @@ private struct JoinWaitlistView: View {
                                         ProgressView()
                                             .controlSize(.small)
 
-                                        Text("Loading current queue length...")
+                                        Text("Checking current details...")
                                             .font(.subheadline)
                                             .foregroundStyle(.secondary)
                                     }
@@ -539,69 +555,90 @@ private struct JoinWaitlistView: View {
                             }
                         }
 
-                        AppCard {
-                            VStack(alignment: .leading, spacing: 14) {
-                                SectionLabel(title: "Guest details", subtitle: "These come from your saved profile.")
+                        if isSelfCheckInUnavailable {
+                            AppCard {
+                                VStack(spacing: 10) {
+                                    Text("Self Check-in Not Available")
+                                        .font(.title3.weight(.semibold))
+                                        .multilineTextAlignment(.center)
 
-                                ReadOnlyField(title: "Name", value: name, systemImage: "person")
-                                ReadOnlyField(title: "Email", value: requestEmail, systemImage: "envelope")
-                                ReadOnlyField(title: "Phone Number", value: phoneNumber, systemImage: "phone")
+                                    Text(selfCheckInUnavailableReason)
+                                        .font(.body)
+                                        .foregroundStyle(.secondary)
+                                        .multilineTextAlignment(.center)
 
-                                if trimmedName.isEmpty {
-                                    BannerView(
-                                        title: "Name required",
-                                        message: "Add your name in the Profile tab before joining the waitlist.",
-                                        systemImage: "person.crop.circle.badge.exclamationmark",
-                                        tint: .orange
-                                    )
+                                    Text("Please speak with a staff member to join the waitlist")
+                                        .font(.body.weight(.medium))
+                                        .multilineTextAlignment(.center)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                            }
+                        } else {
+                            AppCard {
+                                VStack(alignment: .leading, spacing: 14) {
+                                    SectionLabel(title: "Guest details", subtitle: "These come from your saved profile.")
+
+                                    ReadOnlyField(title: "Name", value: name, systemImage: "person")
+                                    ReadOnlyField(title: "Email", value: requestEmail, systemImage: "envelope")
+                                    ReadOnlyField(title: "Phone Number", value: phoneNumber, systemImage: "phone")
+
+                                    if trimmedName.isEmpty {
+                                        BannerView(
+                                            title: "Name required",
+                                            message: "Add your name in the Profile tab before joining the waitlist.",
+                                            systemImage: "person.crop.circle.badge.exclamationmark",
+                                            tint: .orange
+                                        )
+                                    }
                                 }
                             }
-                        }
 
-                        AppCard {
-                            VStack(alignment: .leading, spacing: 18) {
-                                SectionLabel(title: "Waitlist details", subtitle: "Add a few details to help the host team.")
+                            AppCard {
+                                VStack(alignment: .leading, spacing: 18) {
+                                    SectionLabel(title: "Waitlist details", subtitle: "Add a few details to help the host team.")
 
-                                VStack(alignment: .leading, spacing: 10) {
-                                    HStack {
-                                        Text("Party Size")
-                                            .font(.headline)
+                                    VStack(alignment: .leading, spacing: 10) {
+                                        HStack {
+                                            Text("Party Size")
+                                                .font(.headline)
 
-                                        Spacer()
+                                            Spacer()
 
-                                        StatusBadge(label: "\(partySize) guests", tint: AppTheme.secondary)
+                                            StatusBadge(label: "\(partySize) guests", tint: AppTheme.secondary)
+                                        }
+
+                                        Stepper("Party Size", value: $partySize, in: 1...99)
+                                            .labelsHidden()
+                                    }
+                                    .padding(16)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                            .fill(AppTheme.fieldBackground)
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                            .stroke(AppTheme.border.opacity(0.18), lineWidth: 1)
+                                    )
+
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        Text("Note")
+                                            .font(.subheadline.weight(.semibold))
+                                            .foregroundStyle(.secondary)
+
+                                        TextField("Anything the venue should know?", text: $note, axis: .vertical)
+                                            .lineLimit(3, reservesSpace: true)
+                                            .appInputStyle()
                                     }
 
-                                    Stepper("Party Size", value: $partySize, in: 1...99)
-                                        .labelsHidden()
-                                }
-                                .padding(16)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                        .fill(AppTheme.fieldBackground)
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                        .stroke(AppTheme.border.opacity(0.18), lineWidth: 1)
-                                )
-
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Text("Note")
-                                        .font(.subheadline.weight(.semibold))
-                                        .foregroundStyle(.secondary)
-
-                                    TextField("Anything the venue should know?", text: $note, axis: .vertical)
-                                        .lineLimit(3, reservesSpace: true)
-                                        .appInputStyle()
-                                }
-
-                                if let joinWaitlistErrorMessage {
-                                    BannerView(
-                                        title: "Unable to join waitlist",
-                                        message: joinWaitlistErrorMessage,
-                                        systemImage: "exclamationmark.triangle.fill",
-                                        tint: .red
-                                    )
+                                    if let joinWaitlistErrorMessage {
+                                        BannerView(
+                                            title: "Unable to join waitlist",
+                                            message: joinWaitlistErrorMessage,
+                                            systemImage: "exclamationmark.triangle.fill",
+                                            tint: .red
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -611,34 +648,36 @@ private struct JoinWaitlistView: View {
                 }
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                VStack(spacing: 10) {
-                    if let joinWaitlistValidationMessage {
-                        Text(joinWaitlistValidationMessage)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Button {
-                        Task {
-                            await joinWaitlist()
+                if !isSelfCheckInUnavailable {
+                    VStack(spacing: 10) {
+                        if let joinWaitlistValidationMessage {
+                            Text(joinWaitlistValidationMessage)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
                         }
-                    } label: {
-                        HStack(spacing: 10) {
-                            if isSubmittingWaitlist {
-                                ProgressView()
-                                    .tint(.white)
+
+                        Button {
+                            Task {
+                                await joinWaitlist()
                             }
+                        } label: {
+                            HStack(spacing: 10) {
+                                if isSubmittingWaitlist {
+                                    ProgressView()
+                                        .tint(.white)
+                                }
 
-                            Text(isSubmittingWaitlist ? "Joining..." : "Join Waitlist")
+                                Text(isSubmittingWaitlist ? "Joining..." : "Join Waitlist")
+                            }
                         }
+                        .buttonStyle(PrimaryActionButtonStyle())
+                        .disabled(!canSubmitJoinWaitlist)
                     }
-                    .buttonStyle(PrimaryActionButtonStyle())
-                    .disabled(!canSubmitJoinWaitlist)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+                    .padding(.bottom, 12)
+                    .background(.ultraThinMaterial)
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
-                .padding(.bottom, 12)
-                .background(.ultraThinMaterial)
             }
             .alert("You're on the waitlist", isPresented: joinWaitlistSuccessAlertBinding) {
                 Button("OK", role: .cancel) {}
@@ -680,6 +719,19 @@ private struct JoinWaitlistView: View {
             return
         }
 
+        do {
+            let availability = try await SupabaseFunctionsClient.shared.fetchSelfCheckInAvailability(
+                businessShortCode: businessShortCode
+            )
+            selfCheckInAvailability = availability
+
+            guard availability.available else {
+                return
+            }
+        } catch {
+            selfCheckInAvailability = nil
+        }
+
         isSubmittingWaitlist = true
         defer { isSubmittingWaitlist = false }
 
@@ -711,6 +763,7 @@ private struct JoinWaitlistView: View {
     private func loadSelectedVenueDetails() async {
         venueQueueLength = nil
         venueDetailsError = nil
+        selfCheckInAvailability = nil
 
         guard !selectedVenue.isEmpty else { return }
         guard let businessShortCode = selectedVenueBusinessShortCode, !businessShortCode.isEmpty else {
@@ -732,6 +785,17 @@ private struct JoinWaitlistView: View {
         } catch {
             guard selectedVenueBusinessShortCode == businessShortCode else { return }
             venueDetailsError = error.localizedDescription
+        }
+
+        do {
+            let availability = try await SupabaseFunctionsClient.shared.fetchSelfCheckInAvailability(
+                businessShortCode: businessShortCode
+            )
+            guard selectedVenueBusinessShortCode == businessShortCode else { return }
+            selfCheckInAvailability = availability
+        } catch {
+            guard selectedVenueBusinessShortCode == businessShortCode else { return }
+            selfCheckInAvailability = nil
         }
     }
 

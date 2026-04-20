@@ -133,6 +133,17 @@ struct SelfCheckInData: Decodable {
     }
 }
 
+struct SelfCheckInAvailabilityData: Decodable {
+    let available: Bool
+    let reason: String?
+    let code: String?
+    let timezone: String?
+    let day: String?
+    let currentTime: String?
+    let opensAt: String?
+    let closesAt: String?
+}
+
 final class SupabaseFunctionsClient {
     static let shared = SupabaseFunctionsClient()
 
@@ -209,6 +220,16 @@ final class SupabaseFunctionsClient {
         return response.data
     }
 
+    func fetchSelfCheckInAvailability(businessShortCode: String) async throws -> SelfCheckInAvailabilityData {
+        let response: SelfCheckInAvailabilityResponse = try await supabase.functions.invoke(
+            "self-checkin-available",
+            options: .init(
+                body: ["businessShortCode": businessShortCode]
+            )
+        )
+        return response.data
+    }
+
     func registerDeviceToken(_ fcmToken: String, shortCode: String, platform: String) async throws {
         try await supabase.functions.invoke(
             "register-device-token",
@@ -263,4 +284,9 @@ private struct PositionResponse: Decodable {
 private struct SelfCheckInResponse: Decodable {
     let success: Bool
     let data: SelfCheckInData
+}
+
+private struct SelfCheckInAvailabilityResponse: Decodable {
+    let success: Bool
+    let data: SelfCheckInAvailabilityData
 }
