@@ -46,7 +46,16 @@ final class PushNotificationRegistrationManager {
         if shouldPromptForAuthorization {
             canRegisterForRemoteNotifications = await requestNotificationAuthorizationIfNeeded(using: settings)
         } else {
-            canRegisterForRemoteNotifications = settings.authorizationStatus == .ephemeral
+            switch settings.authorizationStatus {
+            case .authorized, .provisional, .ephemeral:
+                canRegisterForRemoteNotifications = true
+            case .notDetermined:
+                canRegisterForRemoteNotifications = await requestNotificationAuthorizationIfNeeded(using: settings)
+            case .denied:
+                canRegisterForRemoteNotifications = false
+            @unknown default:
+                canRegisterForRemoteNotifications = false
+            }
         }
 
         guard canRegisterForRemoteNotifications else { return }
