@@ -7,6 +7,7 @@
 	<key>com.apple.developer.associated-domains</key>
 	<array>
 		<string>appclips:getwaitdesk.com</string>
+		<string>applinks:getwaitdesk.com</string>
 	</array>
 </dict>
 </plist>
