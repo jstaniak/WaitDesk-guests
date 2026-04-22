@@ -1,10 +1,9 @@
 import SwiftUI
 
-private let clipPartyShortCode = "7y675ykaw1"
-
 @main
 struct WaitDesk_clipApp: App {
     @UIApplicationDelegateAdaptor(WaitDeskAppDelegate.self) var appDelegate
+    @State private var clipPartyShortCode: String?
 
     var body: some Scene {
         WindowGroup {
@@ -14,6 +13,17 @@ struct WaitDesk_clipApp: App {
                         shortCode: clipPartyShortCode
                     )
                 }
+                .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { userActivity in
+                    updateShortCode(from: userActivity.webpageURL)
+                }
+                .onOpenURL { url in
+                    updateShortCode(from: url)
+                }
         }
+    }
+
+    private func updateShortCode(from url: URL?) {
+        let shortCode = url?.lastPathComponent.trimmingCharacters(in: .whitespacesAndNewlines)
+        clipPartyShortCode = (shortCode?.isEmpty == false) ? shortCode : nil
     }
 }

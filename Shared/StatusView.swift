@@ -329,7 +329,7 @@ struct StatusView: View {
         .onAppear {
             wasConnected = connectivityObserver.isConnected
         }
-        .task(id: refreshCycle) {
+        .task(id: "\(refreshCycle)-\(trimmedPartyShortCode ?? "")") {
             guard trimmedPartyShortCode != nil else { return }
             await runStatusLifecycle()
         }
